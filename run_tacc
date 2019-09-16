@@ -1,0 +1,21 @@
+#!/bin/sh
+##SBATCH -p  RM-small
+#SBATCH -p  skx-normal
+#SBATCH -t 00:20:00
+#SBATCH -N 1
+##SBATCH --ntasks-per-node 4
+#SBATCH --ntasks  16
+## SBATCH --switches=1
+
+#echo commands to stdout
+set -x
+
+#load required modules
+
+#module load mpi/intel_openmpi
+module load intel/18.0.2  impi/18.0.2
+module load phdf5/1.8.16
+
+
+#run
+ibrun ./bin/PittPack 64 64 64 
