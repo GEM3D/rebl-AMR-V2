@@ -1,11 +1,6 @@
 # Synopsis
 **rebl-AMR** is an Open-Source Software for Binarized-Octree Mesh Generation around Immersed Geometries. <br/>
-The main goal is to generate octrees for adaptive mesh refinement (AMR) of Cartesian domains with immersed complex geometries with the following
-boundary conditions:
- 
-  * Neumann-Neumann
-  * Neumann-Dirichlet
-  * Dirichlet-Dirichlet
+The main goal is to generate octrees for adaptive mesh refinement (AMR) of Cartesian domains with immersed complex geometries.
 
 ## Features
   * MPI parallelization
@@ -29,7 +24,7 @@ rebl-AMR requires the following libraries
 
 ##  Build  
 rebl-AMR uses *CMakeLists.txt* and *CMakeModules* folder to detect the library paths. <br/>
-These two components are crucial for complilation of PittPack.
+These two components are crucial for complilation of rebl-AMR.
 Perform the following steps
 ```
   cd build
