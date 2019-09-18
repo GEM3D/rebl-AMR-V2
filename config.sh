@@ -22,8 +22,8 @@ fi
 
 printf "${RED}\n \n       System is =  $cluster ${RESET}\n \n"
 
-
-read -p "To Configure for GPU press 1 else enter 0:  " GPU
+GPU=0
+#read -p "To Configure for GPU press 1 else enter 0:  " GPU
 #echo $GPU
 
 printf "${GREEN} \n Configuring ... ... ${RESET}\n \n"
