@@ -108,7 +108,6 @@ void zoltanSetParams();
 //bool zoltanGeometricPartitionerSerial( const uint size, const uint ncube_total, const uint offset, int comsizei, struct Zoltan_Struct *zz, Zoltan_Out *zoltan_out );
 bool zoltanGeometricPartitionerSerial( const uint size, const uint ncube_total, const uint offset, int comsize, Zoltan_Out *zoltan_out );
 
-void reSize(uint sze);
 /*
 friend int get_number_of_objects( void *data, int *ierr );
 

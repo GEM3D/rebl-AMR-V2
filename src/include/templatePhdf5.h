@@ -33,8 +33,6 @@ class templatePhdf5
 //
    void xdmfMultiBlock(TemplateForest<N, Nvalue, M, Mvalue,T> &F, integer comsize ,integer my_rank, uint offset,uint appx );
 
-   void xdmfOffsetCalc(TemplateForest<N, Nvalue, M, Mvalue,T> &F, integer comsize ,integer my_rank, uint offset,uint appx ,int &a, int &b);
-
 
 #if(0)
  

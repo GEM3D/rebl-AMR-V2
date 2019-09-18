@@ -28,12 +28,12 @@ Tree<N, value>::Tree( real *length, real *coords, uint nx, uint ny, uint nz )
 template <size_t N, typename value>
 Tree<N, value>::Tree( real *length, real *coords )
 {
-
     for ( uint i = 0; i < 3; i++ )
     {
         ancestorlength[i] = length[i];
         ancestorcoords[i] = coords[i];
     }
+
     npx = 2;
     npy = 2;
     npz = 2;
@@ -64,11 +64,11 @@ Tree<N, value>::~Tree()
 template <size_t N, typename value>
 void Tree<N, value>::level( morton<N> key, uint *level )
 {
-    *level = N / 3;
+    *level   = N / 3;
     uint rem = N % 3;
     // cout<<"rem="<<rem<<endl; /*!< This remaining will affect the number of bits left over, this offset will be used in the following
     // loop*/
-    uint iend = N / 3;
+    uint      iend = N / 3;
     morton<N> keytemp;
 
     // cout<<"rem "<<rem<<" iend "<<iend<<endl;
@@ -227,17 +227,17 @@ void Tree<N, value>::enclosingBox( morton<N> key, real *X )
 
     // cout<<"idenum"<<idenum<<endl;
     idenum = 1. / idenum;
-    dx = ancestorlength[0] * idenum * 0.5;
-    X[0] = xyz[0] - dx;
-    X[1] = xyz[0] + dx;
+    dx     = ancestorlength[0] * idenum * 0.5;
+    X[0]   = xyz[0] - dx;
+    X[1]   = xyz[0] + dx;
 
     // denum=pow(2,level);
-    dy = ancestorlength[1] * idenum * 0.5;
+    dy   = ancestorlength[1] * idenum * 0.5;
     X[2] = xyz[1] - dy;
     X[3] = xyz[1] + dy;
 
     // denum=pow(2,level);
-    dz = ancestorlength[2] * idenum * 0.5;
+    dz   = ancestorlength[2] * idenum * 0.5;
     X[4] = xyz[2] - dz;
     X[5] = xyz[2] + dz;
 }
@@ -285,17 +285,17 @@ void Tree<N, value>::enclosingBoxFixedLevel( morton<N> key, uint mylevel, real *
 
     // cout<<"idenum"<<idenum<<endl;
     idenum = 1. / idenum;
-    dx = ancestorlength[0] * idenum * 0.5;
-    X[0] = xyz[0] - dx;
-    X[1] = xyz[0] + dx;
+    dx     = ancestorlength[0] * idenum * 0.5;
+    X[0]   = xyz[0] - dx;
+    X[1]   = xyz[0] + dx;
 
     // denum=pow(2,level);
-    dy = ancestorlength[1] * idenum * 0.5;
+    dy   = ancestorlength[1] * idenum * 0.5;
     X[2] = xyz[1] - dy;
     X[3] = xyz[1] + dy;
 
     // denum=pow(2,level);
-    dz = ancestorlength[2] * idenum * 0.5;
+    dz   = ancestorlength[2] * idenum * 0.5;
     X[4] = xyz[2] - dz;
     X[5] = xyz[2] + dz;
 }
@@ -351,37 +351,37 @@ void Tree<N, value>::siblings( morton<N> key, uint mylevel, morton<N> *sibkey )
 
     mylevel = mylevel - 1;
 
-    sibkey[0] = kt.flip( N - 3 * ( mylevel ) - 1 );
+    sibkey[0] = kt.flip( N - 3 * (mylevel)-1 );
     // cout<<"sibkeyi[0] "<<sibkey[0]<<endl;
 
-    kt = key;
-    sibkey[1] = kt.flip( N - 3 * ( mylevel ) - 2 );
+    kt        = key;
+    sibkey[1] = kt.flip( N - 3 * (mylevel)-2 );
     // cout<<"sibkeyi[1] "<<sibkey[1]<<endl;
 
-    kt = key;
-    sibkey[2] = kt.flip( N - 3 * ( mylevel ) - 3 );
+    kt        = key;
+    sibkey[2] = kt.flip( N - 3 * (mylevel)-3 );
     // cout<<"sibkeyi[2] "<<sibkey[2]<<endl;
 
     kt = key;
-    kt.flip( N - 3 * ( mylevel ) - 1 );
-    sibkey[3] = kt.flip( N - 3 * ( mylevel ) - 2 );
+    kt.flip( N - 3 * (mylevel)-1 );
+    sibkey[3] = kt.flip( N - 3 * (mylevel)-2 );
     // cout<<"sibkeyi[3] "<<sibkey[3]<<endl;
 
     kt = key;
-    kt.flip( N - 3 * ( mylevel ) - 1 );
-    sibkey[4] = kt.flip( N - 3 * ( mylevel ) - 3 );
+    kt.flip( N - 3 * (mylevel)-1 );
+    sibkey[4] = kt.flip( N - 3 * (mylevel)-3 );
     // cout<<"sibkeyi[4] "<<sibkey[4]<<endl;
 
     kt = key;
-    kt.flip( N - 3 * ( mylevel ) - 3 );
-    sibkey[5] = kt.flip( N - 3 * ( mylevel ) - 2 );
+    kt.flip( N - 3 * (mylevel)-3 );
+    sibkey[5] = kt.flip( N - 3 * (mylevel)-2 );
     // cout<<"sibkeyi[3] "<<sibkey[5]<<endl;
 
     kt = key;
-    kt.flip( N - 3 * ( mylevel ) - 1 );
-    kt.flip( N - 3 * ( mylevel ) - 2 );
+    kt.flip( N - 3 * (mylevel)-1 );
+    kt.flip( N - 3 * (mylevel)-2 );
 
-    sibkey[6] = kt.flip( N - 3 * ( mylevel ) - 3 );
+    sibkey[6] = kt.flip( N - 3 * (mylevel)-3 );
 }
 
 //==================================================================
@@ -400,13 +400,13 @@ void Tree<N, value>::refine( morton<N> key )
     /* \brief if the morton code does not exist in mesh, refinement is not permitted (refining a nonexsiting element not permitted)*/
     /* \brief for now I have assigned the values as NULL, assign it to what you like for solving your particular problem*/
 
-/*
-    if ( mesh.count( key ) == 0 )
-    {
-        cout << key << endl;
-        //           throw std::runtime_error( RED"Erro in refining key does not exist"RESET );
-    }
-*/
+    /*
+        if ( mesh.count( key ) == 0 )
+        {
+            cout << key << endl;
+            //           throw std::runtime_error( RED"Erro in refining key does not exist"RESET );
+        }
+    */
     // cout<<"N= "<<N<<endl;
     // cout<<"mylevel "<<mylevel<<endl;
     // cout<<"key "<<key<<endl;
@@ -581,10 +581,10 @@ template <size_t N, typename value>
 void Tree<N, value>::fourToOne() /*!< imposes 4:1 balance given the list of elments to be refined in the vector refine list*/
 {
     morton<N> kt;
-    uint mylevel, nbrlevel, a, changedirectionlevel;
+    uint      mylevel, nbrlevel, a, changedirectionlevel;
     morton<N> mykey;
-    uint istart = 0;
-    uint iend = refinelist.size();
+    uint      istart = 0;
+    uint      iend   = refinelist.size();
 
     a = 1;
     // the so-called ripple effect
@@ -648,7 +648,7 @@ void Tree<N, value>::fourToOne() /*!< imposes 4:1 balance given the list of elme
         if ( a == 1 )
         {
             istart = iend;
-            iend = refinelist.size();
+            iend   = refinelist.size();
             //  cout<<"istart=\t"<<istart<<"iend\t"<<iend<<endl;
         }
     }
@@ -672,7 +672,7 @@ void Tree<N, value>::fourToOneP( uint istart,
                                  uint iend ) /*!< imposes 4:1 balance given the list of elments to be refined in the vector refine list*/
 {
     morton<N> kt;
-    uint mylevel, nbrlevel, a, changedirectionlevel;
+    uint      mylevel, nbrlevel, a, changedirectionlevel;
     morton<N> mykey;
     //    uint      istart = 0;
     //    uint      iend   = refinelist.size();
@@ -739,7 +739,7 @@ template <size_t N, typename value>
 void Tree<N, value>::fourToOne() /*!< imposes 4:1 balance given the list of elments to be refined in the vector refine list*/
 {
     morton<N> kt;
-    uint mylevel, nbrlevel, a, changedirectionlevel;
+    uint      mylevel, nbrlevel, a, changedirectionlevel;
     morton<N> mykey;
 
     a = 1;
@@ -841,7 +841,6 @@ uint Tree<N, value>::refineListSize()
 template <size_t N, typename value>
 void Tree<N, value>::refinelistReset()
 {
-
     if ( refinelist.size() != 0 )
     {
         for ( auto it = refinelist.begin(); it != refinelist.end(); it++ )
@@ -936,10 +935,10 @@ uint Tree<N, value>::count( morton<N> key )
 template <size_t N, typename value>
 void Tree<N, value>::derefineDerefineList()
 {
-    morton<N> key;
-    bool bol;
+    morton<N>    key;
+    bool         bol;
     bitvector<N> temp;
-    morton<N> sibkey[8];
+    morton<N>    sibkey[8];
 
     // std::sort(derefinelist.begin(),derefinelist.end(), compare);
 
@@ -982,7 +981,7 @@ void Tree<N, value>::derefineDerefineList()
     {
         key = temp.at( i );
         level( key, &mylevel );
-      //  cout << "temp level= " << mylevel << endl;
+        //  cout << "temp level= " << mylevel << endl;
     }
 
     if ( temp.size() != derefinelist.size() )
@@ -1101,8 +1100,8 @@ typename bitmap<N, value>::iterator Tree<N, value>::find( morton<N> key ) /**!< 
 
 template <size_t N, typename value>
 // typename bitmap<N, int>::iterator Tree<N, value>::findInList( morton<N> key ) /**!< this function is to find a value given the key*/
-typename std::unordered_map<morton<N>, int>::iterator Tree
-<N, value>::findInList( morton<N> key ) /**!< this function is to find a value given the key*/
+typename std::unordered_map<morton<N>, int>::iterator
+Tree<N, value>::findInList( morton<N> key ) /**!< this function is to find a value given the key*/
 {
     //    typename bitmap<N, int>::iterator temp;
 
@@ -1130,10 +1129,9 @@ typename std::unordered_map<morton<N>, int>::iterator Tree
 template <size_t N, typename value>
 void Tree<N, value>::convertStl2Morton( uint geom_size, real *geom_xyz ) /**!< this function is to find a value given the key*/
 {
+    //  mortonSTL.clear();
 
-//     mortonSTL.clear();
-
-    real x, y, z, xmid, ymid, zmid;
+    real      x, y, z, xmid, ymid, zmid;
     morton<N> key = 0;
 
     real xyz[3];
@@ -1141,7 +1139,6 @@ void Tree<N, value>::convertStl2Morton( uint geom_size, real *geom_xyz ) /**!< t
     // std::cout<<"xmax "<<xmax<<" ymax "<<ymax<<" zmax "<<zmax<<endl;
 
     // std::cout<<"xmin "<<xmin<<" ymin "<<ymin<<" zmin "<<zmin<<endl;
-    std::cout << GREEN << "Morton Code Construction for STL Successful it's size is before accumulation " << mortonSTL.size() <<RESET << endl;
 
     for ( uint i = 0; i < geom_size; i++ )
     {
@@ -1150,16 +1147,15 @@ void Tree<N, value>::convertStl2Morton( uint geom_size, real *geom_xyz ) /**!< t
         xyz[2] = geom_xyz[3 * i + 2];
         convertCoordToMorton( xyz, key );
 
-// pushing back inside the above function
         //       mortonSTL.push_back( key );
     }
 
-// sort this in the future
-// std::sort(mortonSTL.begin(),mortonSTL.end());
+    // sort this in the future
+    // std::sort(mortonSTL.begin(),mortonSTL.end());
 
+#if ( 1 )
     real X[6];
 
-#if ( 0 )
     bool bol1, bol2, bol3;
 
     for ( uint i = 0; i < mortonSTL.size(); i++ )
@@ -1181,15 +1177,12 @@ void Tree<N, value>::convertStl2Morton( uint geom_size, real *geom_xyz ) /**!< t
         //      cout<< "key "<<key<<endl;
         if ( !( bol1 && bol2 && bol3 ) )
         {
-       //     throw ::runtime_error( RED "error in generating morton code for STL geometry" RESET );
-      //  std::cout << YELLOW << "MWarning : the key does not belong to any element in encoded Geometry STL " << mortonSTL.size() <<RESET << endl;
-        
+            throw ::runtime_error( RED "error in generating morton code for STL geometry" RESET );
         }
     }
 
+    //   std::cout << GREEN << "Morton Code Construction for STL Successful" << RESET << endl;
 
-#endif
-       std::cout << GREEN << "Morton Code Construction for STL Successful it's size is " << mortonSTL.size() <<RESET << endl;
     /*
     std::cout<<"x "<<x<<"y "<<y<<"z "<<z<<endl;
     std::cout<<key<<endl;
@@ -1199,6 +1192,7 @@ void Tree<N, value>::convertStl2Morton( uint geom_size, real *geom_xyz ) /**!< t
     std::cout<<" zmin "<<X[4]<<" zmax "<<X[5]<<endl;
     */
 }
+#endif
 
 template <size_t N, typename value>
 void Tree<N, value>::convertCoordToMorton( real *xyz, morton<N> &key ) /**!< this function is to find a value given the key*/
@@ -1216,9 +1210,9 @@ void Tree<N, value>::convertCoordToMorton( real *xyz, morton<N> &key ) /**!< thi
     real zmin = ancestorcoords[2] - half * ancestorlength[2];
     real zmax = ancestorcoords[2] + half * ancestorlength[2];
 
-    x = xyz[0];
-    y = xyz[1];
-    z = xyz[2];
+    x   = xyz[0];
+    y   = xyz[1];
+    z   = xyz[2];
     key = 0;
 
     for ( uint j = 0; j < N / 3; j++ )
@@ -1292,13 +1286,31 @@ void Tree<N, value>::pushToRefinelist( uint nlevel ) /**!< this function is to f
             refinelist.insert( {key1, 0} );
         }
     }
-  //  cout << refinelist.size() << endl;
-  /*  
+    //  cout << refinelist.size() << endl;
+    /*
     for(uint i=0;i<refinelist.size();i++)
     {
     std::cout<<refinelist.at(i)<<endl;
     }
-   */
+    */
+}
+
+template <size_t N, typename value>
+void Tree<N, value>::pushToRefinelist( morton<N> &key ) /**!< this function is to find a value given the key*/
+{
+    //  cout<<BLUE"mortonsize "<<mortonSTL.size()<<RESET<<endl;
+    uint mylevel = 0;
+
+    //  cout<<" added to listi "<< key<< endl;
+    // considering dynamic mesh, we need to check if that element actually exists in the mesh
+    level( key, &mylevel );
+    //      cout<<key1<<"mylevel "<<mylevel<<"nlevel "<<nlevel<<endl;
+    if ( refinelist.count( key ) == 0 && mesh.count( key ) != 0 )
+    {
+        //      addToList( {key1,0} );
+        refinelist.insert( {key, 0} );
+        cout << " added to listi " << key << endl;
+    }
 }
 
 template <size_t N, typename value>
@@ -1316,160 +1328,6 @@ void Tree<N, value>::construct( real *length, real *coords, uint nx, uint ny, ui
     mesh.insert( {ancestorkey, nullptr} );
 }
 
-/*
-template <size_t N, typename value>
-void Tree<N, value>::setToZero(  )
-{
-
-    for ( auto it = mesh.begin(); it != mesh.end() ; it++ )
-    {
-        it->second=new value[1];        
-        it->second[0]= ;        
-    }
-
-}
-*/
-/*
-template <size_t N, typename value>
-void Tree<N, value>::ignoreInactive(morton<N> key )
-{
-uint geomlevel;
-
-level(key, &geomlevel );
-
-vector<morton<N>> temp;
-
-morton<N> tmp=0,mykey;
-
-for(int i=0;i<3*geomlevel;i++)
-{
-   tmp.flip(N-i-1);
-}
-
-for(auto it = derefinelist.begin();it!= derefinelist.end();it++)
-{
-   mykey= it->first;
-   mykey |= tmp;
-
-   if(mykey==key)
-   { 
-   temp.push_back(mykey);
-   }
-}
-    
-while(temp.size()!=0)
-{
-  derefinelist.erase(temp.at(temp.size()-1));
-}
-
-}
-*/
-
-template <size_t N, typename value>
-void Tree<N, value>::ignoreInactiveVertices(int nInactive, real * box)
-{
-
-real encBox[6];
-bool bol0,bol1,bol2;
-
-vector<morton<N>> temp;
-
-cout<<" size of derefinelist before = " <<derefinelist.size()  <<endl;
-
-for(int i=0;i<nInactive;i++)
-{
-for(auto it = derefinelist.begin();it!= derefinelist.end();it++)
-{
-
-   enclosingBox(it->first,encBox);
-
- bol0 =  (encBox[0] < box[6*i+1] && encBox[0] > box[6*i+0]) || (encBox[1] < box[6*i+1] && encBox[1] > box[6*i+0]);
-
- bol1 = (encBox[2] < box[6*i+3] && encBox[2] > box[6*i+2]) || (encBox[3] < box[6*i+3] && encBox[3] > box[6*i+2]);
-   
- bol2 = (encBox[4] < box[6*i+5] && encBox[4] > box[6*i+4]) || (encBox[5] < box[6*i+5] && encBox[5] > box[6*i+4]);
-
-
- 
-/*
-   bol0= (center[0] < box[6*i+1] && center[0]> box[6*i+0]); 
-   bol1= (center[1] < box[6*i+3] && center[1]> box[6*i+2]); 
-   bol2= (center[2] < box[6*i+5] && center[2]> box[6*i+4]); 
-*/
- //cout<<" size of ignorance " <<temp.size()  <<endl;
-
-  if(bol0 && bol1 && bol2 )                     
-  {
-   temp.push_back(it->first);
-  }
-
- }
-}
-
- //cout<<"Tree.cpp ????????????????? size of derifinelist after " <<temp.size()  <<endl;
-    
-while(temp.size()!=0)
-{
-  derefinelist.erase(temp.at(temp.size()-1));
-  temp.pop_back();
-}
-cout<<" size of derefinelist after = " <<derefinelist.size()  <<endl;
-
-
-}
-
-
-
-
-template <size_t N, typename value>
-void Tree<N, value>::ignoreInactive(int nInactive, real * box)
-{
-
-real center[6];
-bool bol0,bol1,bol2;
-
-vector<morton<N>> temp;
-
-cout<<" size of derefinelist " <<derefinelist.size()  <<endl;
-
-for(int i=0;i<nInactive;i++)
-{
-for(auto it = derefinelist.begin();it!= derefinelist.end();it++)
-{
-
-   centroid(it->first,center); 
-
-   bol0= (center[0] < box[6*i+1] && center[0]> box[6*i+0]); 
-   bol1= (center[1] < box[6*i+3] && center[1]> box[6*i+2]); 
-   bol2= (center[2] < box[6*i+5] && center[2]> box[6*i+4]);
-//  cout<<"center[0] = "<<center[0]<<", center[1] = " << center[1] << ", center[2] = " << center[2]<<endl; 
-
-// cout<<" size of ignorance " <<temp.size()  <<endl;
-
-  if(bol0 && bol1 && bol2 )                     
-  {
-   temp.push_back(it->first);
-
-  cout<<"center[0] = "<<center[0]<<", center[1] = " << center[1] << ", center[2] = " << center[2]<<endl; 
-
-
-  }
-
- }
-}
-
- cout<<"Tree.cpp ????????????????? size of derifinelist after " <<temp.size()  <<endl;
-    
-while(temp.size()!=0)
-{
-  derefinelist.erase(temp.at(temp.size()-1));
-  temp.pop_back();
-}
-
-}
-
-
-
 template <size_t N, typename value>
 void Tree<N, value>::insertKey( morton<N> key )
 {
@@ -1481,8 +1339,8 @@ void Tree<N, value>::insertKey( morton<N> key )
 template <size_t N, typename value>
 bool Tree<N, value>::isBoundary( morton<N> &key )
 {
-    uint mylevel;
-    bool bol1, bol2;
+    uint      mylevel;
+    bool      bol1, bol2;
     morton<N> kt1, kt2;
     level( key, &mylevel );
     bol2 = false;
@@ -1532,7 +1390,6 @@ std::pair<morton<N>, int> Tree<N, value>::readRefineList( typename std::unordere
 template <size_t N, typename value>
 void Tree<N, value>::flipRefineElemTag( typename std::unordered_map<morton<N>, int>::iterator it )
 {
-
     it->second = 1;
 }
 /*
@@ -1546,15 +1403,14 @@ typename std::unordered_map<morton<N>,int>::iterator  Tree<N, value>::readDerefi
 template <size_t N, typename value>
 morton<N> Tree<N, value>::readDerefineList( typename std::unordered_map<morton<N>, int>::iterator it )
 {
-
     return ( it->first );
 }
 
 template <size_t N, typename value>
 bool Tree<N, value>::isBoundary( const morton<N> &key, uint direction )
 {
-    uint mylevel;
-    bool bol1, bol2;
+    uint      mylevel;
+    bool      bol1, bol2;
     morton<N> kt1, kt2;
     level( key, &mylevel );
     bol2 = true;
@@ -1583,8 +1439,8 @@ template <size_t N, typename value>
 void Tree<N, value>::getDirections( morton<N> &key, vector<uint> &directions )
 {
     directions.clear();
-    uint mylevel;
-    bool bol1, bol2;
+    uint      mylevel;
+    bool      bol1, bol2;
     morton<N> kt1, kt2;
     level( key, &mylevel );
     bol2 = false;
@@ -1719,7 +1575,7 @@ void Tree<N, value>::constructHigherLevelNbrs( const morton<N> &key, const uint 
     // repeat the last three bits
     for ( uint i = 0; i < 3; i++ )
     {
-        kt[N - 1 - 3 * ( keylevel ) - i] = kt[N - 1 - 3 * ( keylevel - 1 ) - i];
+        kt[N - 1 - 3 * (keylevel)-i] = kt[N - 1 - 3 * ( keylevel - 1 ) - i];
     }
     // cout<<key<<endl;
     // cout<<direction<<endl;
@@ -1727,15 +1583,93 @@ void Tree<N, value>::constructHigherLevelNbrs( const morton<N> &key, const uint 
     // careful implementation eliminates one flip
     for ( uint i = 0; i < 4; i++ )
     {
-        kt.flip( N - 1 - 3 * ( keylevel ) - index[4 * direction + i] );
+        kt.flip( N - 1 - 3 * (keylevel)-index[4 * direction + i] );
         nbr[i] = kt;
         // cout<<GREEN<<kt<<RESET<<endl;
     }
 }
 
 template <size_t N, typename value>
+void Tree<N, value>::constructHigherLevelNbrs( const morton<N> &key, const uint &keylevel, int signBit, const uint &direction,
+                                               vector<morton<N>> &nbr )
+{
+    static const uint index[12] = {0, 1, 2, 1, 1, 0, 2, 0, 2, 0, 1, 0};
+
+    if ( N < 3 * ( keylevel + 1 ) )
+    {
+        throw std::runtime_error( "level is too big to fit in the given morton code" );
+    }
+
+    morton<N> kt;
+    kt = key;
+    // generate one level higher in the tree
+
+    ////cout<<YELLOW<<key<<RESET<<endl;
+    // repeat the last three bits
+    for ( uint i = 0; i < 3; i++ )
+    {
+        kt[N - 1 - 3 * (keylevel)-i] = kt[N - 1 - 3 * ( keylevel - 1 ) - i];
+    }
+    // cout<<key<<endl;
+    // cout<<direction<<endl;
+
+    // careful implementation eliminates one flip
+    for ( uint i = 0; i < 4; i++ )
+    {
+        kt.flip( N - 1 - 3 * (keylevel)-index[4 * direction + i] );
+        nbr.push_back( kt );
+        // cout<<GREEN<<kt<<RESET<<endl;
+    }
+
+    for ( uint i = 0; i < 4; i++ )
+    {
+        //    cout<<" bitSign "<< signBit <<"  "<<keylevel <<endl;
+
+        if ( signBit == 1 && key == 0 && keylevel == 0 )
+        {
+            nbr.at( i ).flip( N - 1 - direction );
+        }
+        //   cout<<GREEN<<nbr.at(i)<<RESET<<endl;
+    }
+}
+
+template <size_t N, typename value>
 void Tree<N, value>::constructNonlocalHigherLevelNbrs( const morton<N> &key, const uint &keylevel, const uint &direction, morton<N> *nbr )
 {
+    static const uint index[9] = {1, 2, 1, 0, 2, 0, 0, 1, 0};
+
+    if ( N < 3 * ( keylevel + 1 ) )
+    {
+        throw std::runtime_error( "level is too big to fit in the given morton code" );
+    }
+
+    morton<N> kt;
+    kt = key;
+    // generate one level higher in the tree
+
+    // repeat the last three bits
+    for ( uint i = 0; i < 3; i++ )
+    {
+        kt[N - 1 - 3 * (keylevel)-i] = kt[N - 1 - 3 * ( keylevel - 1 ) - i];
+        nbr[0]                       = kt;
+    }
+    // cout<<key<<endl;
+    // cout<<direction<<endl;
+
+    // careful implementation eliminates one flip
+    for ( uint i = 0; i < 3; i++ )
+    {
+        kt.flip( N - 1 - 3 * (keylevel)-index[3 * direction + i] );
+        nbr[i + 1] = kt;
+        // cout<<GREEN<<kt<<RESET<<endl;
+    }
+}
+
+template <size_t N, typename value>
+void Tree<N, value>::constructNonlocalHigherLevelNbrs( const morton<N> &key, const uint &keylevel, int signBit, const uint &direction,
+                                                       vector<morton<N>> &nbr )
+{
+    // nbr.clear();
     static const uint index[9] = {1, 2, 1, 0, 2, 0, 0, 1, 0};
 
     if ( N < 3 * ( keylevel + 1 ) )
@@ -1750,44 +1684,64 @@ void Tree<N, value>::constructNonlocalHigherLevelNbrs( const morton<N> &key, con
     // repeat the last three bits
     for ( uint i = 0; i < 3; i++ )
     {
-        kt[N - 1 - 3 * ( keylevel ) - i] = kt[N - 1 - 3 * ( keylevel - 1 ) - i];
-        nbr[0] = kt;
+        kt[N - 1 - 3 * (keylevel)-i] = kt[N - 1 - 3 * ( keylevel - 1 ) - i];
     }
-    // cout<<key<<endl;
-    // cout<<direction<<endl;
+    // cout<<"--------------------------"<<endl;
 
+    //     cout<<key<<endl;
+    //     cout<<direction<<endl;
+
+    nbr.push_back( kt );
     // careful implementation eliminates one flip
     for ( uint i = 0; i < 3; i++ )
     {
-        kt.flip( N - 1 - 3 * ( keylevel ) - index[3 * direction + i] );
-        nbr[i + 1] = kt;
+        kt.flip( N - 1 - 3 * (keylevel)-index[3 * direction + i] );
+        // nbr[i + 1] = kt;
+        nbr.push_back( kt );
         // cout<<GREEN<<kt<<RESET<<endl;
     }
+
+    for ( uint i = 0; i < 4; i++ )
+    {
+        //    cout<<" bitSign "<< signBit <<"  "<<keylevel <<endl;
+
+        if ( signBit == 1 && key == 0 && keylevel == 0 )
+        {
+            nbr.at( i ).flip( N - 1 - direction );
+        }
+        //   cout<<GREEN<<nbr.at(i)<<RESET<<endl;
+    }
+
+    /*
+      for(int i=0;i<nbr.size();i++)
+      {
+          cout<<YELLOW<<nbr.at(i)<<RESET<<endl;
+      }
+  cout<<"----------------------------------"<<endl;
+  */
 }
 
 template <size_t N, typename value>
 void Tree<N, value>::printMesh()
 {
-
     // bitmap<N,typename value*>::hasher fn = mesh.hash_function();
 
     for ( auto it = mesh.begin(); it != mesh.end(); it++ )
     {
-       // cout << it->first << "   " << it->first.to_ulong() << endl;
+        cout << it->first << "   " << it->first.to_ulong() << endl;
         // cout<<fn(it->first)<<endl;
     }
 
     for ( auto &x : mesh )
     {
-        //std::cout << "Element [" << x.first << ":" << x.second << "]";
-        //std::cout << " is in bucket #" << mesh.bucket( x.first ) << "  " << x.first.to_ulong() << std::endl;
+        std::cout << "Element [" << x.first << ":" << x.second << "]";
+        std::cout << " is in bucket #" << mesh.bucket( x.first ) << "  " << x.first.to_ulong() << std::endl;
     }
 }
 
 template <size_t N, typename value>
 void Tree<N, value>::getKey( uint i, morton<N> &key )
 {
-
     auto it = std::next( mesh.begin(), i );
 
     key = it->first;
@@ -1833,11 +1787,11 @@ typename unordered_map<morton<N>, int>::iterator Tree<N, value>::Dend()
 
 //======================================================================================
 /**
-*  \brief If any of the siblings are listed in the dereffinement do not add to the list
-*  as derefining one child means removing all the siblings
-*
-*
-* */
+ *  \brief If any of the siblings are listed in the dereffinement do not add to the list
+ *  as derefining one child means removing all the siblings
+ *
+ *
+ * */
 
 #if ( 1 )
 template <size_t N, typename value>
@@ -1845,7 +1799,7 @@ void Tree<N, value>::addToDerefineList( morton<N> key )
 {
     bool bol = true;
 
-    uint mylevel, klevel;
+    uint      mylevel, klevel;
     morton<N> sibkey[7], kt;
     level( key, &mylevel );
     siblings( key, mylevel, sibkey );
@@ -1882,8 +1836,8 @@ void Tree<N, value>::pushToDerefinelist( uint nlevel ) /**!< this function is to
 
     key = 0;
     // cout<<mortonSTL.size()<<endl;
-    uint mylevel;
-    morton<N> sibkey[7];
+    uint                          mylevel;
+    morton<N>                     sibkey[7];
     std::unordered_set<morton<N>> temp;
 
     // first clear the derefinelist
@@ -1911,13 +1865,11 @@ void Tree<N, value>::pushToDerefinelist( uint nlevel ) /**!< this function is to
         if ( temp.count( key1 ) == 0 )
         {
             temp.insert( key1 );
-            //cout<<key1<<endl;
         }
     }
 
     for ( auto it = mesh.begin(); it != mesh.end(); it++ )
     {
-
         key = it->first;
         level( key, &mylevel );
         kt = key;
@@ -1935,9 +1887,9 @@ void Tree<N, value>::pushToDerefinelist( uint nlevel ) /**!< this function is to
     }
     temp.clear();
 
-//    cout << derefinelist.size() << endl;
+    //    cout << derefinelist.size() << endl;
 
-//    cout << RED "stl size " << mortonSTL.size() << RESET << endl;
+    //    cout << RED "stl size " << mortonSTL.size() << RESET << endl;
 }
 #endif
 
@@ -1945,7 +1897,7 @@ template <size_t N, typename value>
 void Tree<N, value>::retainFourToOne() /*!< imposes 4:1 balance given the list of elments to be refined in the vector refine list*/
 {
     morton<N> kt;
-    uint mylevel, nbrlevel, a, changedirectionlevel;
+    uint      mylevel, nbrlevel, a, changedirectionlevel;
     morton<N> mykey, sibkey[7];
     //    uint      istart = 0;
     //    uint      iend   = refinelist.size();
@@ -2015,7 +1967,7 @@ template <size_t N, typename value>
 void Tree<N, value>::removeFromDerefineList( typename std::unordered_map<morton<N>, int>::iterator it ) /*!< E;iminate from derefinelist*/
 {
     // this is to remove from the list so removes all 8 element
-    uint mylevel;
+    uint      mylevel;
     morton<N> key, sibkey[8];
     key = it->first;
     level( key, &mylevel );
@@ -2038,6 +1990,7 @@ void Tree<N, value>::removeFromDerefineList( typename std::unordered_map<morton<
 //         derefine: Eliminate An Element From Mesh
 //
 //===========================================================
+
 template <size_t N, typename value>
 void Tree<N, value>::derefine( morton<N> key )
 {
@@ -2048,7 +2001,7 @@ void Tree<N, value>::derefine( morton<N> key )
 
     /*!< \brief if the key does not exist simply igonre doing anything*/
     morton<N> sibkey[7], kt;
-    uint mylevel;
+    uint      mylevel;
 
     level( key, &mylevel );
 
@@ -2064,7 +2017,7 @@ void Tree<N, value>::derefine( morton<N> key )
         }
 
         mesh.erase( key );
-        kt = key;
+        kt                              = key;
         kt[N - 3 * ( mylevel - 1 ) - 1] = 0;
         kt[N - 3 * ( mylevel - 1 ) - 2] = 0;
         kt[N - 3 * ( mylevel - 1 ) - 3] = 0;
@@ -2079,17 +2032,17 @@ void Tree<N, value>::derefine( morton<N> key )
 template <size_t N, typename value>
 void Tree<N, value>::derefineDerefineList()
 {
-    morton<N> key;
-    bool bol;
+    morton<N>    key;
+    bool         bol;
     bitvector<N> temp;
-    morton<N> sibkey[8];
+    morton<N>    sibkey[8];
 
     uint mylevel;
     //    uint maxlevel = nlevel;
-    uint changedirectionlevel, nbrlevel;
+    uint      changedirectionlevel, nbrlevel;
     morton<N> kt;
 
-    //cout << " derefine list " << derefinelist.size() << endl;
+    cout << " derefine list " << derefinelist.size() << endl;
 
     retainFourToOne();
 
@@ -2116,7 +2069,6 @@ void Tree<N, value>::clearMesh() /*!< Eliminate from derefinelist*/
 template <size_t N, typename value>
 void Tree<N, value>::mortonSTLclear() /*!< Eliminate from derefinelist*/
 {
-
     mortonSTL.clear();
     mortonSTL.shrink_to_fit();
 }
@@ -2127,7 +2079,6 @@ void Tree<N, value>::mortonSTLclear() /*!< Eliminate from derefinelist*/
 template <size_t N, typename value>
 void Tree<N, value>::insertSeed( morton<N> &key ) /*!< Eliminate from derefinelist*/
 {
-
     // not that constructing the object will put the root as 0
     // for weak scaling we only need one seed given by key as input to this function
 
@@ -2140,7 +2091,6 @@ void Tree<N, value>::insertSeed( morton<N> &key ) /*!< Eliminate from derefineli
 template <size_t N, typename value>
 void Tree<N, value>::insertNbrs( vector<int> &Nbrs ) /*!< add neighbors*/
 {
-
     for ( uint i = 0; i < Nbrs.size(); i++ )
     {
         morton<N> key( Nbrs.at( i ) );
@@ -2148,40 +2098,6 @@ void Tree<N, value>::insertNbrs( vector<int> &Nbrs ) /*!< add neighbors*/
         mesh.insert( {key, nullptr} );
     }
 }
-
-template <size_t N, typename value>
-void Tree<N, value>::getCoords( real *X ) /*!< add neighbors*/
-{
-
-      X[0]=ancestorcoords[0]-0.5*ancestorlength[0];
-      X[1]=ancestorcoords[0]+0.5*ancestorlength[0];
-
-      X[2]=ancestorcoords[1]-0.5*ancestorlength[1];
-      X[3]=ancestorcoords[1]+0.5*ancestorlength[1];
- 
-      X[4]=ancestorcoords[2]-0.5*ancestorlength[2];
-      X[5]=ancestorcoords[2]+0.5*ancestorlength[2];
-
-}
-
-template <size_t N, typename value>
-bool Tree<N, value>::operator==(const  Tree<N, value>  & T0) const /*!< add neighbors*/
-{
-
-       
-       bool bol0=fabs(T0.ancestorcoords[0]-this->ancestorcoords[0])<1e-6;
-       bool bol1=fabs(T0.ancestorcoords[1]-this->ancestorcoords[1])<1e-6;
-       bool bol2=fabs(T0.ancestorcoords[2]-this->ancestorcoords[2])<1e-6;
-     
-       bool bol3=fabs(T0.ancestorlength[0]-this->ancestorlength[0])<1e-6;
-       bool bol4=fabs(T0.ancestorlength[1]-this->ancestorlength[1])<1e-6;
-       bool bol5=fabs(T0.ancestorlength[2]-this->ancestorlength[2])<1e-6;
-
-       bol0=bol0 && bol1 && bol2 && bol3 && bol4 && bol5;
-
-      return(bol0);
-}
-
 
 #if ( 0 )
 template <size_t N, typename Nvalue, size_t N1>
@@ -2251,9 +2167,79 @@ void convertCoordToMorton( Tree<N, Nvalue> T, real *xyz, morton<N> &key ) /**!< 
 
 #endif
 
+template <size_t N, typename value>
+void Tree<N, value>::allocatePointers()
+{
+    for ( auto it = mesh.begin(); it != mesh.end(); it++ )
+    {
+        // watch out not to allocate memory for already allocated ones
+        if ( it->second == nullptr )
+        {
+            ( it->second ) = new value[( npx + 1 ) * ( npy + 1 ) * ( npz + 1 )];
+        }
+    }
+
+    // cout<<" npx  "<<npx<<" "<<npy<<" "<<npz<<endl;
+
+    // initializeValue(5.0);
+}
+
+template <size_t N, typename value>
+void Tree<N, value>::initializeValue( value v )
+{
+    for ( auto it = mesh.begin(); it != mesh.end(); it++ )
+    {
+        for ( int i = 0; i < ( npx + 1 ) * ( npy + 1 ) * ( npz + 1 ); i++ )
+        {
+            // ((it->second)[i])=i;
+        }
+    }
+}
+
+// there is no need for deallocation as object clean up willl do it
+
+template <size_t N, typename value>
+bool Tree<N, value>::getSibling( morton<N> key, uint mylevel, uint direction, morton<N> &sibkey )
+{
+    assert( mylevel != 0 );
+
+    mylevel = mylevel - 1;
+    int  offset;
+    bool location = 1;
+
+    switch ( direction )
+    {
+        case 0:
+            offset = 1;
+            break;
+
+        case 1:
+            offset = 2;
+            break;
+
+        case 2:
+            offset = 3;
+            break;
+    }
+
+    //     cout<<" offset "<<offset<<" key "<<key<<" " << key[N - 3 * ( mylevel ) - offset]<<endl;
+
+    if ( key[N - 3 * (mylevel)-offset] == false )
+    {
+        //  cout<<" inside "<<endl;
+        location = 0;
+    }
+
+    sibkey = key;
+    sibkey.flip( N - 3 * (mylevel)-offset );
+
+    return ( location );
+}
+
+/*
 template class Tree<TREESIZE, uint>;
 template class Tree<TREESIZE, real>;
-
+*/
 
 template class Tree<64, uint>;
 template class Tree<64, real>;
@@ -2266,26 +2252,24 @@ template class Tree<6, uint>;
 template class Tree<9, uint>;
 template class Tree<6, real>;
 template class Tree<9, real>;
+template class Tree<3, Q>;
 
-/*
 template class Tree<PROCSIZE, uint>;
-template class Tree<PROCSIZE, real>;
-*/
-//TheTemplate<conditional<is_same<Type2, Type4>::value, dummy<4>, Type4>::type>
 
+// TheTemplate<conditional<is_same<Type2, Type4>::value, dummy<4>, Type4>::type>
 
+#if ( 1 )
+// template class Tree<conditional<!is_same< Tree<PROCSIZE,uint>, Tree<TREESIZE,uint> > ::value,Tree<5,uint> >;
+// template class Tree<!is_same< Tree<PROCSIZE,uint>, Tree<TREESIZE,uint> > ::value,Tree<> >;
+// template class  Tree<conditional<(!is_same< Tree<PROCSIZE,uint>, Tree<TREESIZE,uint> > ::value) ,
+// Tree<10,uint>,Tree<PROCSIZE,uint>>::type>;
 
-#if(1)
-//template class Tree<conditional<!is_same< Tree<PROCSIZE,uint>, Tree<TREESIZE,uint> > ::value,Tree<5,uint> >;
-//template class Tree<!is_same< Tree<PROCSIZE,uint>, Tree<TREESIZE,uint> > ::value,Tree<> >;
-//template class  Tree<conditional<(!is_same< Tree<PROCSIZE,uint>, Tree<TREESIZE,uint> > ::value) , Tree<10,uint>,Tree<PROCSIZE,uint>>::type>;
-
-//template class Tree<enable_if<!is_same<TREESIZE,unit, PROCSIZE,uint>::value>,Type3>::type>, uint>;
-//template class Tree<TREESIZE, real>;
+// template class Tree<enable_if<!is_same<TREESIZE,unit, PROCSIZE,uint>::value>,Type3>::type>, uint>;
+// template class Tree<TREESIZE, real>;
 #endif
 
-//template class Tree<PROCSIZE, real>;
-
+template class Tree<PROCSIZE, real>;
+template class Tree<PROCSIZE, Q>;
 
 /*
 template class Tree<48, real>;

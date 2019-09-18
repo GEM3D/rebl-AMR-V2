@@ -3,28 +3,31 @@
 
 #########################################
 #infor aboutt he cluster 
+#cluster= smp (default)
+#partition= smp (default)
+#100 nodes of 24-core Xeon Gold 6126 2.60 GHz (Skylake)
+#192 GB RAM
+#256 GB SSD & 500 GB SSD
+#10GigE
 
-#cluster= mpi
-
- #   partition= opa (default)
- #      96 nodes of 28-core Intel Xeon E5-2690 2.60 GHz (Broadwell)
- #      64 GB RAM/node
- #       256 GB SSD
- #       100 Gb Omni-Path
- #   partition= ib
- #       32 nodes of 20-core Intel Xeon E5-2660 2.60 GHz (Haswell)
- #       128 GB RAM/node
- #       56 Gb FDR
+##cluster= mpi
+##partition= opa (default)
+##96 nodes of 28-core Intel Xeon E5-2690 2.60 GHz (Broadwell)
+##64 GB RAM/node
+##256 GB SSD
+##100 Gb Omni-Path
+##partition= ib
+##32 nodes of 20-core Intel Xeon E5-2660 2.60 GHz (Haswell)
+##128 GB RAM/node
+##56 Gb FDR
 
 
 #########################################
 
 #SBATCH --time=0-05:30:00
 
-#SBATCH --cluster=smp
-#SBATCH --partition=smp
 
-## number of nodes should be bigger than one otherwise it will complain
+##number of nodes should be bigger than one otherwise it will complain
 ##SBATCH --cluster=mpi
 ##SBATCH --partition=ib
 ##SBATCH --partition=opa
@@ -49,32 +52,32 @@
 
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=4	
 
 ## if you specify only this the system automatically finds out the number of nodes
-##SBATCH --ntasks=9
+## SBATCH --ntasks=9
 
 # -O is used to overspecify the cores, especially beneficial for debugging
-##SBATCH -O
+## SBATCH -O
 ###########################################
 
              # Load modules
 
 ###########################################
 # module purge removes all the previously loaded modules
-module purge
-module load  intel/2018.2.199
-module load intel-mpi/2018.2.199
+#module purge
+
+module load intel/2017.1.132
+module load intel-mpi/2017.1.132
 module load hdf5/1.10.0
 module load  cmake/3.7.1
 module load parmetis/4.0.3
 module load zoltan/3.83.0
-		
-export CC=$I_MPI_ROOT/intel64/bin/mpicc
-export CXX=$I_MPI_ROOT/intel64/bin/mpiicpc
-export MPI_ROOT=$I_MPI_ROOT/intel64;
 
-mpirun -np $SLURM_NTASKS ./bin/amrGem input/Cylinder.stl 1 6 
 
+mpirun -np 4  ./bin/amrGem input/bunny.stl 2 2
+
+##mpirun -np $SLURM_NTASKS  ./bin/amrGem input/bunny.stl 6 6
 
 
 

@@ -66,22 +66,6 @@ int initFlag=0;
 }
 
 
-void Partition::reSize(uint sze)
-{
-  
- 
-  weight=(real*)realloc(weight,sze*sizeof(real)); 
-
-  if(weight==NULL)
-  {
-   cout<<" realloc failed in part "<<endl;
-   }
-
-
-}
-
-
-
 void Partition::construct(int argcs,char *pArgs[],int meth,int sze)
 {
 
@@ -232,7 +216,7 @@ bool Partition::zoltanGeometricPartitioner( const uint size, const uint ncube_to
 
     myMesh.numGlobalPoints = ncube_total;
     myMesh.numMyPoints = size;
-    //cout<<"size= "<<size<<endl;
+    cout<<"size= "<<size<<endl;
     myMesh.myGlobalIDs = nullptr;
     myMesh.myGlobalIDs = (ZOLTAN_ID_PTR)malloc( size * sizeof( ZOLTAN_ID_TYPE ) );
 
@@ -417,7 +401,7 @@ bool Partition::zoltanGeometricPartitionerSerial( const uint size, const uint nc
         myMesh.c[3 * i + 2] = XYZ.at( i ).z;
 
         myMesh.w[i] = weight[i];
-        	printf("%d %lf %lf %lf %lf\n", i  ,myMesh.w[i],myMesh.c[3*i],myMesh.c[3*i+1],myMesh.c[3*i+2]);
+//        	printf("%d %lf %lf %lf %lf\n", i  ,myMesh.w[i],myMesh.c[3*i],myMesh.c[3*i+1],myMesh.c[3*i+2]);
     }
 
 //     printf("my_rank =%d number of my points %d glob_id global_id %d %d \n",Com.myrank,myMesh->numMyPoints,myMesh->myGlobalIDs[0],myMesh->myGlobalIDs[1]);
@@ -472,6 +456,7 @@ bool Partition::zoltanGeometricPartitionerSerial( const uint size, const uint nc
     delete[] myMesh.w;
     delete[] myMesh.myGlobalIDs;
 */
+return true;
 }
 
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

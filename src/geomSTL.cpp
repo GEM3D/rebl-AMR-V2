@@ -1,7 +1,6 @@
 #include "geomSTL.h"
 #include "definitions.h"
-#include "params.h"
-
+#define MYSCALE 0.25
 
 Vec3::Vec3( void )
 {
@@ -117,76 +116,31 @@ Vec3::~Vec3( void )
 //
 //
 //
-void GeomSTL::construct(int nSTL, real* xyz)
+void GeomSTL::construct(real* xyz1)
 {
-
-for(int i=0;i<6;i++)
+for(int i=0;i<3;i++)
 {
-this->xyz[i]=xyz[i];
+xyz[i]=xyz1[i];
 }
-
-this->nSTL = nSTL;
-
-distanceToBoundaries = new real[6];
-fitParlpd            = new real[6];  
-}
-
-void GeomSTL::construct( real* xyz)
-{
-for(int i=0;i<6;i++)
-{
-this->xyz[i]=xyz[i];
-}
-}
-
-
-GeomSTL::~GeomSTL()
-{
-      if(distanceToBoundaries!=nullptr)
-      {
-	delete [] distanceToBoundaries;
-      }
-   
-      if(fitParlpd!=nullptr)
-      {
-	delete [] fitParlpd; 
-      }
-
-}
-
-void GeomSTL::updateDistanceToBoundaries(){
-
-
-	distanceToBoundaries[0] = abs(centroid.x - xyz[0]) ;  
-	distanceToBoundaries[1] = abs(centroid.x - xyz[1]) ;  
-    distanceToBoundaries[2] = abs(centroid.y - xyz[2]) ;  
-	distanceToBoundaries[3] = abs(centroid.y - xyz[3]) ;  
-	distanceToBoundaries[4] = abs(centroid.z - xyz[4]) ;  
-	distanceToBoundaries[5] = abs(centroid.z - xyz[5]) ;  
 
 }
 
 
 
-void GeomSTL::readSTLGeom(char *argv[],const int n, const real *xyz,const double init_loc[3])
+void GeomSTL::readSTLGeom( char *argv[], const real *xyz )
 {
     real scale = 0.02;
 
     real disp = 1.0;
 
-    auto info = parse_stl( argv[n] );
-
-    cout<<" STL file name "<< argv[n]<<endl;
-
-
-
+    auto info = parse_stl( argv[1] );
 #if ( 1 )
 
     std::vector<triangle> triangles = info.triangles;
     // QMOut << "STL HEADER = " << info.name << std::endl;
     //  QMOut << "# triangles = " << triangles.size() << std::endl;
 
-     real center[3] = {0.0, 0.0, 0.0};
+    real center[3] = {0.0, 0.0, 0.0};
 
     // This is for debugging
     // QMOut << info.triangles[88000]<<std::endl;
@@ -196,18 +150,14 @@ void GeomSTL::readSTLGeom(char *argv[],const int n, const real *xyz,const double
 
     for ( unsigned int i = 0; i < triangles.size(); i++ )
     {
- 		
-	   
         center[0] += ( info.triangles[i].v1.x + info.triangles[i].v2.x + info.triangles[i].v3.x );
         center[1] += ( info.triangles[i].v1.y + info.triangles[i].v2.y + info.triangles[i].v3.y );
         center[2] += ( info.triangles[i].v1.z + info.triangles[i].v2.z + info.triangles[i].v3.z );
-   
- }
+    }
 
     center[0] = center[0] / triangles.size() / 3.0;
     center[1] = center[1] / triangles.size() / 3.0;
     center[2] = center[2] / triangles.size() / 3.0;
-
 
     // min and max can be found and then converted to center by division by 3
 
@@ -232,8 +182,6 @@ void GeomSTL::readSTLGeom(char *argv[],const int n, const real *xyz,const double
         }
     }
 
-
-
     scale = xmax;
     if ( ymax > scale )
     {
@@ -247,22 +195,18 @@ void GeomSTL::readSTLGeom(char *argv[],const int n, const real *xyz,const double
 
     for ( unsigned int i = 0; i < triangles.size(); i++ )
     {
-        
-        info.triangles[i].v1.x = info.triangles[i].v1.x * scale - center[0] * scale+ init_loc[0];
-        info.triangles[i].v1.y = info.triangles[i].v1.y * scale - center[1] * scale+ init_loc[1];
-        info.triangles[i].v1.z = info.triangles[i].v1.z * scale - center[2] * scale+ init_loc[2];
+        info.triangles[i].v1.x = info.triangles[i].v1.x * scale - center[0] * scale;
+        info.triangles[i].v1.y = info.triangles[i].v1.y * scale - center[1] * scale;
+        info.triangles[i].v1.z = info.triangles[i].v1.z * scale - center[2] * scale;
 
-        info.triangles[i].v2.x = info.triangles[i].v2.x * scale - center[0] * scale+ init_loc[0];
-        info.triangles[i].v2.y = info.triangles[i].v2.y * scale - center[1] * scale+ init_loc[1];
-        info.triangles[i].v2.z = info.triangles[i].v2.z * scale - center[2] * scale+ init_loc[2];
+        info.triangles[i].v2.x = info.triangles[i].v2.x * scale - center[0] * scale;
+        info.triangles[i].v2.y = info.triangles[i].v2.y * scale - center[1] * scale;
+        info.triangles[i].v2.z = info.triangles[i].v2.z * scale - center[2] * scale;
 
-        info.triangles[i].v3.x = info.triangles[i].v3.x * scale - center[0] * scale+ init_loc[0];
-        info.triangles[i].v3.y = info.triangles[i].v3.y * scale - center[1] * scale+ init_loc[1];
-        info.triangles[i].v3.z = info.triangles[i].v3.z * scale - center[2] * scale+ init_loc[2];
-  
-
-
- }
+        info.triangles[i].v3.x = info.triangles[i].v3.x * scale - center[0] * scale;
+        info.triangles[i].v3.y = info.triangles[i].v3.y * scale - center[1] * scale;
+        info.triangles[i].v3.z = info.triangles[i].v3.z * scale - center[2] * scale;
+    }
 
     geom_nn = 0;
     int bol[3] = {0, 0, 0};
@@ -301,13 +245,13 @@ void GeomSTL::readSTLGeom(char *argv[],const int n, const real *xyz,const double
             ( triangle_center )[3 * count] = ( info.triangles[i].v1.x + info.triangles[i].v2.x + info.triangles[i].v3.x ) / 3.0;
             ( triangle_center )[3 * count + 1] = ( info.triangles[i].v1.y + info.triangles[i].v2.y + info.triangles[i].v3.y ) / 3.0;
             ( triangle_center )[3 * count + 2] = ( info.triangles[i].v1.z + info.triangles[i].v2.z + info.triangles[i].v3.z ) / 3.0;
-            	       // cout<<"GeomSTL.cpp::readSTLGeom:: "<<(triangle_center)[3*count ]<<"\t" <<(triangle_center)[3*count+1]<<"\t"<<(triangle_center)[3*count+2]<<endl;
+            //	        cout<<(*triangle_center)[3*count ]<<"\t" <<(*triangle_center)[3*count+1]<<"\t"
+            //<<(*triangle_center)[3*count+2]<<endl;
             count++;
         }
     }
 
-    printf( "scale=%16.16lf %16.16lf %16.16lf %16.16lf %lf %lf %lf\n", scale, center[0] * scale, center[1] * scale, center[2] * scale,init_loc[0],init_loc[1],init_loc[2] );
-
+    printf( "scale=%16.16lf %16.16lf %16.16lf %16.16lf \n", scale, center[0] * scale, center[1] * scale, center[2] * scale );
 
     if ( CHECK_MESH )
     {
@@ -316,88 +260,7 @@ void GeomSTL::readSTLGeom(char *argv[],const int n, const real *xyz,const double
 
    geom_xyz=triangle_center;
 #endif
-/* Centroid for calculation of distance between objects and boundaries */
- 	centroid.x =scale* center[0] + init_loc[0];
-	centroid.y =scale* center[1] + init_loc[1];
-	centroid.z =scale* center[2] + init_loc[2];
-
-// find the center and the coordinates of the cube holding the object
-/********************************* fitting parallelpiped */
-real XMAX = geom_xyz[0];
-real XMIN = geom_xyz[0];
-real YMAX = geom_xyz[1];
-real YMIN = geom_xyz[1];
-real ZMAX = geom_xyz[2];
-real ZMIN = geom_xyz[2];
-
-;
- 
-  for ( unsigned int i = 0; i < geom_nn; i++ )
-    {
-        if ( geom_xyz[3*i] >= XMAX )
-        {
-            XMAX =  geom_xyz[3*i];
-        }
-	 	if ( geom_xyz[3*i] < XMIN )
-        {
-            XMIN =  geom_xyz[3*i];
-        }
-
-
-        if ( geom_xyz[3*i + 1] >= YMAX )
-        {
-            YMAX =  geom_xyz[3*i + 1 ];
-        }
-	 	if ( geom_xyz[3*i + 1] < YMIN )
-        {
-            YMIN =  geom_xyz[3*i + 1];
-        }
-
-
-        if ( geom_xyz[3*i + 2] >= ZMAX )
-        {
-            ZMAX =  geom_xyz[3*i + 2 ];
-        }
-	 	if ( geom_xyz[3*i + 2] < ZMIN )
-        {
-            ZMIN =  geom_xyz[3*i + 2];
-        }
-
-      
-    }
-	
-	fitParlpd[0] = XMIN; 
-	fitParlpd[1] = XMAX ;
-	fitParlpd[2] = YMIN ; 
-	fitParlpd[3] = YMAX ;
-	fitParlpd[4] = ZMIN ;
-	fitParlpd[5] = ZMAX ;
-
- cout<<" box before [0] = "<<fitParlpd[0]<< " box before [1] = "<<fitParlpd[1]<<" box before [2] = "<<fitParlpd[2]<<endl;
- cout<<" box before [3] = "<<fitParlpd[3]<<" box before [4] = "<<fitParlpd[4]<<" box before [5] = "<<fitParlpd[5]<<endl;
-
-
-   int icount = 0;
-   
-   while(icount<6){
-   
-  	  if(fitParlpd[icount] <= 0.0)
-      {
-		 fitParlpd[icount]-= PPDTL;
-       }
-	else 
-    {
-	    fitParlpd[icount]+= PPDTL;
-   	
-	} 
-	    icount++;
-   }
-
- cout<<" box after [0] = "<<fitParlpd[0]<< " box after [1] = "<<fitParlpd[1]<<" box after [2] = "<<fitParlpd[2]<<endl;
- cout<<" box after [3] = "<<fitParlpd[3]<<" box after [4] = "<<fitParlpd[4]<<" box after [5] = "<<fitParlpd[5]<<endl;
-
-
-} 
+}
 
 void GeomSTL::checkMesh( std::vector<triangle> &triangles )
 {
@@ -483,7 +346,7 @@ void GeomSTL::checkMesh( std::vector<triangle> &triangles )
         AreaY = 0.5f * ( ( v1.Vectors().Z * v2.Vectors().X ) - ( v1.Vectors().X * v2.Vectors().Z ) );
         AreaZ = 0.5f * ( ( v1.Vectors().X * v2.Vectors().Y ) - ( v1.Vectors().Y * v2.Vectors().X ) );
 
-        /*      //***********Debug****************
+        /*      // ***********Debug****************
                 if ( i == 0 ) {
                 QMOut << "Node 1: (" << triangles[i].v1.x << ", " << triangles[i].v1.y << ", " << triangles[i].v1.z << ")" <<endl;
 
@@ -517,7 +380,7 @@ void GeomSTL::checkMesh( std::vector<triangle> &triangles )
         endl;
                 }
 
-                //***************************************
+                // ***************************************
         */
         // Aspect Ratio:
         s = 0.5 * ( v1.Length() + v2.Length() + v3.Length() );

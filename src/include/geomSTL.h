@@ -63,43 +63,30 @@ public:
 
 
 class GeomSTL{
-
   private:
   int geom_nn;
   real *geom_xyz;
   real *__restrict__ triangle_center;
   real xyz[6];
-  point centroid;
-  real *distanceToBoundaries=nullptr;
-  real *fitParlpd=nullptr;
 
-  int nSTL;
-  
   public:
-
   GeomSTL(){};
-  void construct(int nSTL, real *xyz1);
   void construct(real *xyz1);
-
   stl_data parse_stl(const std::string& stl_path);
   float parse_float( std::ifstream &s );
   point parse_point( std::ifstream &s );
   stl_data parseSTL( const std::string &stl_path );
-  void readSTLGeom(char *argv[], int n,  const real *xyz, const double init_loc[3]);
+  void readSTLGeom(  char *argv[],  const real *xyz );
   void checkMesh( std::vector<triangle> &triangles );
-  void updateDistanceToBoundaries();
 
-  template <size_t N, typename Nvalue, size_t M, typename Mvalue >
-  friend class ReblAmr;
+ template <size_t N, typename Nvalue, size_t M, typename Mvalue >
+ friend class ReblAmr;
 
-  template <size_t N, typename Nvalue, size_t M, typename Mvalue >
-  friend class ReblAmrFull;
+ template <size_t N, typename Nvalue, size_t M, typename Mvalue >
+ friend class ReblAmrFull;
 
 
-  template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T >
-  friend class TemplateForest;
 
- ~GeomSTL();
 
 };
  

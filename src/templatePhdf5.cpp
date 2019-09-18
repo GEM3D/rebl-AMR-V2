@@ -34,7 +34,7 @@ void templatePhdf5<N, Nvalue, M, Mvalue, T>::writePolyvertex( TemplateForest<N, 
 
     //  uint forest.size
 
-    uint partialforestsize = F.getTotalSize(); /*!<the forest size for each processor */
+    uint partialforestsize = F.getTotalSize()* ( F.npx * F.npy * F.npz ); /*!<the forest size for each processor */
 
     // do an MPI comunication to get the offset
 
@@ -101,7 +101,192 @@ void templatePhdf5<N, Nvalue, M, Mvalue, T>::writePolyvertex( TemplateForest<N, 
 
     morton<N> key;
     real xc[3];
+    real XYZ[6];
+	real Xa;
+    real Xb;
+    real Ya;
+    real Yb;
+    real Za;
+    real Zb;
+
+    real hx;
+    real hy;
+    real hz;
+    real Xh;
+    real Yh;
+    real Zh;
+    uint L1 = F.npx;
+    uint M1 = F.npy;
+    uint N1 = F.npz;
+
     count = 0;
+
+for ( auto it = F.trees.begin(); it != F.trees.end(); it++ )
+    {
+        for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+        {
+            key = ( it2->first );
+            ( *it ).enclosingBox( key, XYZ );
+
+            //        proc.enclosingBox(key,XYZ);
+
+            Xa = XYZ[0];
+            Xb = XYZ[1];
+            hx = L1;
+            Xh = ( Xb - Xa ) / ( hx );
+
+            //   index = 0;
+
+            for ( uint j = 0; j < L1; j++ )
+            {
+                for ( uint k = 0; k < M1; k++ )
+                {
+                    for ( uint l = 0; l < N1; l++ )
+                    {
+                        xtemp[count] = Xa + Xh * j + 0.5 * Xh;
+                       // cout<<xtemp[count]<<endl;
+                        count++;
+                    }
+                }
+            }
+        }
+    }
+
+
+ count = 0;
+
+    for ( auto it = F.trees.begin(); it != F.trees.end(); it++ )
+    {
+        for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+        {
+            key = ( it2->first );
+            ( *it ).enclosingBox( key, XYZ );
+
+            //       proc.enclosingBox(key,XYZ);
+            //       cout<<XYZ[0]<<" "<<XYZ[1]<<" "<<XYZ[2]<<" "<<XYZ[3]<<" "<<XYZ[4]<<" "<<XYZ[5]<<endl;
+
+            Ya = XYZ[2];
+            Yb = XYZ[3];
+            hy = M1;
+            Yh = ( Yb - Ya ) / ( hy );
+
+            //     index = 0;
+
+            for ( uint j = 0; j < L1; j++ )
+            {
+                for ( uint k = 0; k < M1; k++ )
+                {
+                    for ( uint l = 0; l < N1; l++ )
+                    {
+                        ytemp[count] = Ya + Yh * k + 0.5 * Yh;
+                        count++;
+                    }
+                }
+            }
+        }
+    }
+
+  count = 0;
+    for ( auto it = F.trees.begin(); it != F.trees.end(); it++ )
+    {
+        for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+        {
+            key = ( it2->first );
+            ( *it ).enclosingBox( key, XYZ );
+
+            // proc.enclosingBox(key,XYZ);
+            Za = XYZ[4];
+            Zb = XYZ[5];
+            hz = N1;
+            Zh = ( Zb - Za ) / ( hz );
+
+            //         index = 0;
+
+            for ( uint j = 0; j < L1; j++ )
+            {
+                for ( uint k = 0; k < M1; k++ )
+                {
+                    for ( uint l = 0; l < N1; l++ )
+                    {
+                        ztemp[count] = Za + Zh * l + 0.5 * Zh;
+                        count++;
+                    }
+                }
+            }
+        }
+    }
+
+
+ count = 0;
+ int aux;
+    for ( auto it = F.trees.begin(); it != F.trees.end(); it++ )
+    {
+        for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+        {
+            key = ( it2->first );
+            ( *it ).enclosingBox( key, XYZ );
+
+            // proc.enclosingBox(key,XYZ);
+                                  
+            for ( uint l = 0; l < N1; l++ )
+            {
+                for ( uint k = 0; k < M1; k++ )
+                {
+                    for ( uint j = 0; j < L1; j++ )
+                    {
+                        //qtemp[count] = ( ( it2->second )[( N1 + 2 ) * ( M1 + 2 ) * j + ( N1 + 2 ) * k + l + 1] ).p;
+                        aux=1;
+                        qtemp[count] += ( ( it2->second )[( N1 + 1 ) * ( M1 + 1 ) * j + ( N1 + 1 ) * k + l + 1] ).p;
+                        if(j>1)
+                        {
+                         qtemp[count] += ( ( it2->second )[( N1 + 1 ) * ( M1 + 1 ) * (j-1) + ( N1 + 1 ) * k + l + 1] ).p;
+                         aux++;
+                         }
+                        if(j<L1-1)
+                        {
+                         qtemp[count] += ( ( it2->second )[( N1 + 1 ) * ( M1 + 1 ) * (j+1) + ( N1 + 1 ) * k + l + 1] ).p;
+                         aux++;
+                         }
+                        if(k>1)
+                        {
+                         qtemp[count] += ( ( it2->second )[( N1 + 1 ) * ( M1 + 1 ) * (j) + ( N1 + 1 ) * (k-1) + l + 1] ).p;
+                         aux++;
+                         }
+                        if(k<M1-1)
+                        {
+                         qtemp[count] += ( ( it2->second )[( N1 + 1 ) * ( M1 + 1 ) * (j) + ( N1 + 1 ) * (k+1) + l + 1] ).p;
+                         aux++;
+                         }
+                        if(l>1)
+                        {
+                         qtemp[count] += ( ( it2->second )[( N1 + 1 ) * ( M1 + 1 ) * (j) + ( N1 + 1 ) * (k) + l + 1 + 1] ).p;
+                         aux++;
+                         }
+                        if(l<N1-1)
+                        {
+                         qtemp[count] += ( ( it2->second )[( N1 + 1 ) * ( M1 + 1 ) * (j) + ( N1 + 1 ) * (k) + l +1 - 1] ).p;
+                         aux++;
+                         }
+
+
+                      qtemp[count] =  qtemp[count]/(double)aux; 
+                        
+;
+              //          cout<<( ( it2->second )[( N1 + 2 ) * ( M1 + 2 ) * j + ( N1 + 2 ) * k + l + 1] ).p<<endl;
+
+                        // index = (N1+2)*(M1+2)*j+(N1+2)*k+l+1;
+
+                        count++;
+                    }
+                }
+            }
+        }
+    }
+
+
+
+/*
+
     for ( auto it = F.trees.begin(); it != F.trees.end(); it++ )
     {
         for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
@@ -111,7 +296,10 @@ void templatePhdf5<N, Nvalue, M, Mvalue, T>::writePolyvertex( TemplateForest<N, 
             xtemp[count] = xc[0];
             ytemp[count] = xc[1];
             ztemp[count] = xc[2];
-            qtemp[count] = com.myRank();
+            
+//            qtemp[count] = (it2->second)[0].p;
+
+            // qtemp[count] = com.myRank();
             //        coord_index=cube.at(i).centeroid_index;
             //        Xc=XYZ.at(coord_index).x;
             //        xtemp[i]=Xc;
@@ -120,8 +308,10 @@ void templatePhdf5<N, Nvalue, M, Mvalue, T>::writePolyvertex( TemplateForest<N, 
         }
     }
 
-    count = F.getTotalSize();
-    offset = offset1;
+//    count = F.getTotalSize();
+*/
+  
+   offset = offset1;
     block = 1;
 
     filespace = H5Screate_simple( 1, &total_size, NULL );
@@ -401,7 +591,7 @@ void templatePhdf5<N, Nvalue, M, Mvalue, T>::writeMultiBlock( TemplateForest<N, 
     xtemp = new real[L1 * M1 * N1];
     ytemp = new real[L1 * M1 * N1];
     ztemp = new real[L1 * M1 * N1];
-    qtemp = new real[L1 * M1 * N1];
+    qtemp = new real[(L1-1) * (M1-1) * (N1-1)];
 
     real Xa;
     real Xb;
@@ -437,14 +627,14 @@ void templatePhdf5<N, Nvalue, M, Mvalue, T>::writeMultiBlock( TemplateForest<N, 
     CommCollective<uint> comc( nullptr, 1 );
     comc.getTotalNumber( &offset1, &partialforestsize, &totalvalue );
 
-    //cout << " partial size " << partialforestsize << endl;
+    cout << " partial size " << partialforestsize << endl;
 
     hsize_t myoffset = offset1;
     //  total_size=totalvalue;
 
     totalnumber = totalvalue;
 
-    //cout << offset1 << endl;
+    cout << offset1 << endl;
 
     /*
        * Set up file access property list with parallel I/O access
@@ -731,18 +921,58 @@ void templatePhdf5<N, Nvalue, M, Mvalue, T>::writeMultiBlock( TemplateForest<N, 
     }
 
     H5Dclose( dset_id );
+
+    dimsf[0] = L1-1;
+    dimsf[1] = M1-1;
+    dimsf[2] = N1-1;
+    dimsf[3] = totalnumber;
+
+    chunk_dims[0] = L1-1;
+    chunk_dims[1] = M1-1;
+    chunk_dims[2] = N1-1;
+    chunk_dims[3] = 1;
+
+    /*
+     * Each process defines dataset in memory and writes it to the hyperslab
+     * in the file.
+     */
+
+    count[0] = 1;
+    count[1] = 1;
+    count[2] = 1;
+    count[3] = 1;
+
+    block[0] = chunk_dims[0];
+    block[1] = chunk_dims[1];
+    block[2] = chunk_dims[2];
+    block[3] = chunk_dims[3];
+
+    /*
+      for loop such that each processor can write all the blocks
+    */
+    offset[0] = 0;
+    offset[1] = 0;
+    offset[2] = 0;
+    // offset[3] will be set at loop
+/*
+     for(int i=0;i<4;i++)
+     cout<<chunk_dims[i]<<" "<<endl;
+     for(int i=0;i<4;i++)
+     cout<<dimsf[i]<<" "<<endl;
+*/
     //================================================================================
     //
     //                               write Q
     //
     //================================================================================
-    // filespace = H5Screate_simple(4, dimsf, NULL);
-    //  memspace  = H5Screate_simple(4, chunk_dims, NULL);
+      filespace = H5Screate_simple(4, dimsf, NULL);
+      memspace  = H5Screate_simple(4, chunk_dims, NULL);
 
     sprintf( str0, "/Q" );
     plist_id = H5Pcreate( H5P_DATASET_CREATE );
     H5Pset_chunk( plist_id, 4, chunk_dims );
     dset_id = H5Dcreate( file_id, str0, H5T_NATIVE_DOUBLE, filespace, H5P_DEFAULT, plist_id, H5P_DEFAULT );
+#if(1)
 
     H5Pclose( plist_id );
     H5Sclose( filespace );
@@ -761,24 +991,21 @@ void templatePhdf5<N, Nvalue, M, Mvalue, T>::writeMultiBlock( TemplateForest<N, 
             // proc.enclosingBox(key,XYZ);
             index = 0;
 
-            for ( uint j = 0; j < L1; j++ )
-            {
-                for ( uint k = 0; k < M1; k++ )
+      for ( uint l = 1; l < N1; l++ )
+                    {         
+               for ( uint k = 1; k < M1; k++ )
                 {
-                    for ( uint l = 0; l < N1; l++ )
-                    {
-
-                        /*      if((*it).derefinelist.count(key)!=0 )
-                                  {
-
-                                     ztemp[index]=100.0;
-
-                                  }
-                                 else
-                   */
-                        {
-                            ztemp[index] = com.myRank();
-                        }
+ 				
+            for ( uint j = 1; j < L1; j++ )
+            {
+              	      qtemp[index] = (it2->second[(N1+1)*(M1+1)*j+(N1+1)*k+l]).p;
+              	   //  qtemp[index] = 1.0;
+              	      //cout<< (it2->second[(N1+1)*(M1+1)*j+(N1+1)*k+l]).p<<endl;
+                      //cout<<qtemp[index]<<endl;   
+                      //  qtemp[index]=1.0;
+                      // cout<<index<<" "<<qtemp[index]<<endl;
+                        //index = (N1+2)*(M1+2)*j+(N1+2)*k+l+1;
+//                        qtemp[index]=my_rank;
                         index++;
                     }
                 }
@@ -786,7 +1013,7 @@ void templatePhdf5<N, Nvalue, M, Mvalue, T>::writeMultiBlock( TemplateForest<N, 
             // define the offset, only in the fourth dimension
 
             offset[3] = myoffset + co;
-            // printf("my_rank=%d offset=%d\n",my_rank,offset[3]);
+//             printf("my_rank=%d offset=%d\n",offset[3]);
             // status = H5Sselect_hyperslab(filespace, H5S_SELECT_SET, offset, NULL, count, block);
             H5Sselect_hyperslab( filespace, H5S_SELECT_SET, offset, NULL, count, block );
             plist_id = H5Pcreate( H5P_DATASET_XFER );
@@ -795,29 +1022,30 @@ void templatePhdf5<N, Nvalue, M, Mvalue, T>::writeMultiBlock( TemplateForest<N, 
             // status = H5Dwrite(dset_id, H5T_NATIVE_DOUBLE, memspace,filespace,plist_id, xtemp);
             if ( sizeof( real ) == sizeof( double ) )
             {
-                H5Dwrite( dset_id, H5T_NATIVE_DOUBLE, memspace, filespace, plist_id, ztemp );
+                H5Dwrite( dset_id, H5T_NATIVE_DOUBLE, memspace, filespace, plist_id, qtemp );
             }
             else if ( sizeof( real ) == sizeof( float ) )
             {
 
-                H5Dwrite( dset_id, H5T_NATIVE_FLOAT, memspace, filespace, plist_id, ztemp );
+                H5Dwrite( dset_id, H5T_NATIVE_FLOAT, memspace, filespace, plist_id, qtemp );
             }
 
-            //  H5Dwrite(dset_id, H5T_NATIVE_DOUBLE, memspace,filespace,plist_id, ztemp);
             H5Pclose( plist_id );
             co = co + 1;
         }
     }
 
     H5Dclose( dset_id );
+
     xdmfMultiBlock( F, com.mySize(), com.myRank(), offset1, appx );
 
+#endif
     delete[] xtemp;
     delete[] ytemp;
     delete[] ztemp;
     delete[] qtemp;
 
-#if ( 0 )
+#if ( 1 )
 #endif
 }
 
@@ -920,288 +1148,10 @@ static void integer_string( char *strin, int i )
 //#define offset1 2005
 // if you have a time dependent that goes beyond 10 need to replace this
 
-
-template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
-void  templatePhdf5<N, Nvalue, M, Mvalue, T>::xdmfOffsetCalc( TemplateForest<N, Nvalue, M, Mvalue, T> &F, integer comsize, integer my_rank,                                                            uint offset, uint appx ,int &a, int &b)
-{
-     MPI_File fp;
-    int buf[1000], np = comsize;
-    MPI_Request request;
-    unsigned int i;
-    int j;
-
-    MPI_Status status;
-    const char *names[] = {"X", "Y", "Z"};
-
-    uint L1 = F.npx;
-    uint M1 = F.npy;
-    uint N1 = F.npz;
-
-    //const int offset0 = 156;
-    // const int offset1=2005;
-   // const int offset1 = 2053;
-
-    char strname[1000], fname[1000];
-    uint ncube_total = totalnumber;
-    sprintf( strname, XDMF_NAME, appx );
-    char str[1000];
-    //cout << "size str" << strlen( strname ) << endl;
-
-    MPI_File_open( MPI_COMM_WORLD, strname, MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fp );
-
-    // printf("%s\n",str);
-    // dont need to specify the address here as they are both reside in one folder, that is
-    // why I use H5FILE in addition to H5FILE_NAME
-    sprintf( fname, H5FILE, appx );
-
-    char strL[200];
-    char strM[200];
-    char strN[200];
-    char strNcube[1000];
-    char stroff[1000];
-    int index;
-
-    if ( L1 < 10 )
-    {
-        sprintf( strL, "00%d", L1 );
-        sprintf( strM, "00%d", M1 );
-        sprintf( strN, "00%d", N1 );
-    }
-    else if ( L1 < 100 )
-    {
-        sprintf( strL, "0%d", L1 );
-        sprintf( strM, "0%d", M1 );
-        sprintf( strN, "0%d", N1 );
-    }
-    else
-    {
-        printf( "discretization too big go change xdmf function\n" );
-        exit( 0 );
-    }
-
-     if ( ncube_total < 10 )
-    {
-        sprintf( strNcube, "00000000000%d", ncube_total );
-    }
-    else if ( ncube_total < 100 )
-    {
-        sprintf( strNcube, "0000000000%d", ncube_total );
-    }
-    else if ( ncube_total < 1000 )
-    {
-        sprintf( strNcube, "000000000%d", ncube_total );
-    }
-    else if ( ncube_total < 10000 )
-    {
-        sprintf( strNcube, "00000000%d", ncube_total );
-    }
-    else if ( ncube_total < 100000 )
-    {
-        sprintf( strNcube, "0000000%d", ncube_total );
-    }
-    else if ( ncube_total < 1000000 )
-    {
-        sprintf( strNcube, "000000%d", ncube_total );
-    }
-    else if ( ncube_total < 10000000 )
-    {
-        sprintf( strNcube, "00000%d", ncube_total );
-    }
-    else if ( ncube_total < 100000000 )
-    {
-        sprintf( strNcube, "0000%d", ncube_total );
-    }
-    else if ( ncube_total < 1000000000 )
-    {
-        sprintf( strNcube, "000%d", ncube_total );
-    }
-    else if ( ncube_total < 10000000000 )
-    {
-        sprintf( strNcube, "00%d", ncube_total );
-    }
-    else if ( ncube_total < 100000000000 )
-    {
-        sprintf( strNcube, "0%d", ncube_total );
-    }
-    else if ( ncube_total < 1000000000000 )
-    {
-        sprintf( strNcube, "%d", ncube_total );
-    }
-
-    else
-    {
-        printf( "number of cubes larger than 10^12\n" );
-        exit( 0 );
-    }
-
-#if(DEBUG)
-    cout << ncube_total << endl;
-#endif
-    uint co = 0;
-
-    // a counts the offset for header whic is only written by process rank 0 and  and b the hyperslab part for each cube
-   // int a = 0, b = 0;
-
-	    sprintf( str, "<?xml version=\"1.0\" ?>\n" );
-     //   MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-        a = a + strlen( str );
-        sprintf( str, "<!DOCTYPE Xdmf SYSTEM \"Xdmf.dtd\" []> \n" );
-     //  MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-        a = a + strlen( str );
-        sprintf( str, "<Xdmf Version=\"2.0\">\n" );
-     //   MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-        a = a + strlen( str );
-        sprintf( str, "<Domain>\n" );
-     //   MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-        a = a + strlen( str );
-        sprintf( str, "<Grid Name=\"AMR\" GridType=\"Collection\" CollectionType=\"Spatial\">\n" );
-     //    MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-        a = a + strlen( str );
-#if(DEBUG)
-        printf( "size a=%d\n", a );
-#endif
-// for(unsigned int i=0;i<cube.size();i++)
-#if ( 1 )
-
-        co = 0;
-        for ( auto it = F.trees.begin(); it != F.trees.end(); it++ )
-        {
-            for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
-            {
-
-                // b calculates the offset for each block, need to be set to zero becasue it is inside the loop
-                // but we dont want to accumulate, calculate only for one block
-                b = 0;
-                sprintf( str, "   <Grid Name=\"mesh0\" GridType=\"Uniform\">\n" );
-       //         MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-                b = b + strlen( str );
-                sprintf( str, "        <Topology TopologyType=\"3DSMesh\" NumberOfElements=\"%s %s %s\"/>\n", strL, strM, strN );
-                // printf("hyperslab =%d\n",strlen(str));
-        //       MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-                b = b + strlen( str );
-                sprintf( str, "          <Geometry GeometryType=\"X_Y_Z\">  \n" );
-          //      MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-                b = b + strlen( str );
-
-                for ( j = 0; j < 3; j++ )
-                {
-                    sprintf( str, "      <DataItem ItemType=\"HyperSlab\" Dimensions=\"%s %s %s %d\" NumberType=\"Float\" Precision=\"4\"  "
-                                  "Type=\"HyperSlab\"> \n",
-                             strL, strM, strN, 1 );
-            //        MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-                    b = b + strlen( str );
-                    sprintf( str, "         <DataItem Dimensions=\"3 4\" Format=\"XML\" > \n" );
-              //      MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-                    b = b + strlen( str );
-                    index = offset + co;
-                    integer_string( stroff, index );
-                    sprintf( str, "         %d %d %d %s  \n", 0, 0, 0, stroff );
-                //    MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-                    b = b + strlen( str );
-                    sprintf( str, "         %d %d %d %d  \n", 1, 1, 1, 1 );
-                  //  MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-                    b = b + strlen( str );
-                    sprintf( str, "         %s %s %s %d  \n", strL, strM, strN, 1 );
-                   // MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-                    b = b + strlen( str );
-                    sprintf( str, "         </DataItem>\n" );
-                   // MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-                    b = b + strlen( str );
-                    sprintf(
-                    str,
-                    "          <DataItem Name=\"%s\" Dimensions=\"%s %s %s %s\" NumberType=\"Float\" Precision=\"4\" Format=\"HDF\">\n",
-                    names[j], strL, strM, strN, strNcube );
-                   // MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-                    b = b + strlen( str );
-                    sprintf( str, "          %s:/%s\n", fname, names[j] );
-                   // MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-                    b = b + strlen( str );
-                    sprintf( str, "         </DataItem>\n" );
-                   // MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-                    b = b + strlen( str );
-                    sprintf( str, "         </DataItem>\n" );
-                    //MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-                    b = b + strlen( str );
-                }
-                sprintf( str, "      </Geometry>   \n" );
-               // MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-                b = b + strlen( str );
-                // added because of including solution vector Q
-                sprintf( str, "         <Attribute Name=\"Q\" AttributeType=\"Scalar\" Center=\"Node\"> \n" );
-                //MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-                b = b + strlen( str );
-                sprintf( str, "      <DataItem ItemType=\"HyperSlab\" Dimensions=\"%s %s %s %d\" NumberType=\"Float\" Precision=\"4\"  "
-                              "Type=\"HyperSlab\"> \n",
-                         strL, strM, strN, 1 );
-                //MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-                b = b + strlen( str );
-                sprintf( str, "         <DataItem Dimensions=\"3 4\" Format=\"XML\" > \n" );
-               // MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-                b = b + strlen( str );
-                index = offset + co;
-                integer_string( stroff, index );
-                sprintf( str, "         %d %d %d %s  \n", 0, 0, 0, stroff );
-                //MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-                b = b + strlen( str );
-                sprintf( str, "         %d %d %d %d  \n", 1, 1, 1, 1 );
-                //MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-                b = b + strlen( str );
-                sprintf( str, "         %s %s %s %d  \n", strL, strM, strN, 1 );
-               // MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-                b = b + strlen( str );
-                sprintf( str, "         </DataItem>\n" );
-               // MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-                b = b + strlen( str );
-                sprintf( str,
-                         "          <DataItem Name=\"Q\" Dimensions=\"%s %s %s %s\" NumberType=\"Float\" Precision=\"4\" Format=\"HDF\">\n",
-                         strL, strM, strN, strNcube );
-               // MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-                b = b + strlen( str );
-                sprintf( str, "          %s:/Q\n", fname );
-               // MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-                b = b + strlen( str );
-                sprintf( str, "         </DataItem>\n" );
-               // MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-                b = b + strlen( str );
-                sprintf( str, "         </DataItem>\n" );
-               // MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-                b = b + strlen( str );
-                sprintf( str, " </Attribute>\n" );
-               // MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-                b = b + strlen( str );
-                sprintf( str, "  </Grid>\n" );
-              //  MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-                b = b + strlen( str );
-                co++;
-                // put error here
-               /*
-				 if ( a != offset0 || b != offset1 )
-                {
-                    printf( "??????????????????????????????????????????\n" );
-                    printf( "Go fix your offset for Xdmf meta data file a=%d offset0=%d b=%d offset1=%d\n", a, offset0, b, offset1 );
-                    printf( "??????????????????????????????????????????\n" );
-                    exit( 0 );
-                }
-
-*/                // printf("size length9=%d length11=%d\n",strlen("9"),strlen("11"));
-            }
-
-        }
-#endif
-    }
-
-
-
-
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
 void templatePhdf5<N, Nvalue, M, Mvalue, T>::xdmfMultiBlock( TemplateForest<N, Nvalue, M, Mvalue, T> &F, integer comsize, integer my_rank,
                                                              uint offset, uint appx )
-{ 
-	int aa,bb;
-	xdmfOffsetCalc( F, comsize,my_rank, offset, appx ,aa,bb);
-	//cout<<" a from offsetcal = "<<aa<<endl;
-	//cout<<" b from offsetcalc = "<<bb<<endl;
- 
+{
     MPI_File fp;
     int buf[1000], np = comsize;
     MPI_Request request;
@@ -1215,9 +1165,10 @@ void templatePhdf5<N, Nvalue, M, Mvalue, T>::xdmfMultiBlock( TemplateForest<N, N
     uint M1 = F.npy;
     uint N1 = F.npz;
 
-    const int offset0 = aa;
+    const int offset0 = 156;
     // const int offset1=2005;
-    const int offset1 = bb;
+   // const int offset1 = 2044;
+    const int offset1 = 2053;
 
     char strname[1000], fname[1000];
     uint ncube_total = totalnumber;
@@ -1240,6 +1191,10 @@ void templatePhdf5<N, Nvalue, M, Mvalue, T>::xdmfMultiBlock( TemplateForest<N, N
     char stroff[1000];
     int index;
 
+    char strL1[200];
+    char strM1[200];
+    char strN1[200];
+ 
     if ( L1 < 10 )
     {
         sprintf( strL, "00%d", L1 );
@@ -1257,6 +1212,26 @@ void templatePhdf5<N, Nvalue, M, Mvalue, T>::xdmfMultiBlock( TemplateForest<N, N
         printf( "discretization too big go change xdmf function\n" );
         exit( 0 );
     }
+
+
+    if ( L1 < 10 )
+    {
+        sprintf( strL1, "00%d", L1-1 );
+        sprintf( strM1, "00%d", M1-1 );
+        sprintf( strN1, "00%d", N1-1 );
+    }
+    else if ( L1 < 100 )
+    {
+        sprintf( strL1, "0%d", L1-1 );
+        sprintf( strM1, "0%d", M1-1 );
+        sprintf( strN1, "0%d", N1-1 );
+    }
+    else
+    {
+        printf( "discretization too big go change xdmf function\n" );
+        exit( 0 );
+    }
+
 
     /* number of cubes limited to less than a million here upgrade to a trillion
       if(ncube_total<10)
@@ -1439,12 +1414,12 @@ void templatePhdf5<N, Nvalue, M, Mvalue, T>::xdmfMultiBlock( TemplateForest<N, N
                 MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
                 b = b + strlen( str );
                 // added because of including solution vector Q
-                sprintf( str, "         <Attribute Name=\"Q\" AttributeType=\"Scalar\" Center=\"Node\"> \n" );
+                sprintf( str, "         <Attribute Name=\"Q\" AttributeType=\"Scalar\" Center=\"Cell\"> \n" );
                 MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
                 b = b + strlen( str );
                 sprintf( str, "      <DataItem ItemType=\"HyperSlab\" Dimensions=\"%s %s %s %d\" NumberType=\"Float\" Precision=\"4\"  "
                               "Type=\"HyperSlab\"> \n",
-                         strL, strM, strN, 1 );
+                         strL1, strM1, strN1, 1 );
                 MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
                 b = b + strlen( str );
                 sprintf( str, "         <DataItem Dimensions=\"3 4\" Format=\"XML\" > \n" );
@@ -1458,7 +1433,7 @@ void templatePhdf5<N, Nvalue, M, Mvalue, T>::xdmfMultiBlock( TemplateForest<N, N
                 sprintf( str, "         %d %d %d %d  \n", 1, 1, 1, 1 );
                 MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
                 b = b + strlen( str );
-                sprintf( str, "         %s %s %s %d  \n", strL, strM, strN, 1 );
+                sprintf( str, "         %s %s %s %d  \n", strL1, strM1, strN1, 1 );
                 MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
                 b = b + strlen( str );
                 sprintf( str, "         </DataItem>\n" );
@@ -1466,7 +1441,7 @@ void templatePhdf5<N, Nvalue, M, Mvalue, T>::xdmfMultiBlock( TemplateForest<N, N
                 b = b + strlen( str );
                 sprintf( str,
                          "          <DataItem Name=\"Q\" Dimensions=\"%s %s %s %s\" NumberType=\"Float\" Precision=\"4\" Format=\"HDF\">\n",
-                         strL, strM, strN, strNcube );
+                         strL1, strM1, strN1, strNcube );
                 MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
                 b = b + strlen( str );
                 sprintf( str, "          %s:/Q\n", fname );
@@ -1498,7 +1473,6 @@ void templatePhdf5<N, Nvalue, M, Mvalue, T>::xdmfMultiBlock( TemplateForest<N, N
         }
 #endif
     }
-
 // made here a bit more conservative, originally there was an else here, but we arenot allowed to put a barried right before else
 // 
      MPI_Barrier(MPI_COMM_WORLD);
@@ -1567,11 +1541,11 @@ void templatePhdf5<N, Nvalue, M, Mvalue, T>::xdmfMultiBlock( TemplateForest<N, N
                 MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
                 // insert here the value of qs
 
-                sprintf( str, "         <Attribute Name=\"Q\" AttributeType=\"Scalar\" Center=\"Node\"> \n" );
+                sprintf( str, "         <Attribute Name=\"Q\" AttributeType=\"Scalar\" Center=\"Cell\"> \n" );
                 MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
                 sprintf( str, "      <DataItem ItemType=\"HyperSlab\" Dimensions=\"%s %s %s %d\" NumberType=\"Float\" Precision=\"4\"  "
                               "Type=\"HyperSlab\"> \n",
-                         strL, strM, strN, 1 );
+                         strL1, strM1, strN1, 1 );
                 MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
                 sprintf( str, "         <DataItem Dimensions=\"3 4\" Format=\"XML\" > \n" );
                 MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
@@ -1581,11 +1555,11 @@ void templatePhdf5<N, Nvalue, M, Mvalue, T>::xdmfMultiBlock( TemplateForest<N, N
                 MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
                 sprintf( str, "         %d %d %d %d  \n", 1, 1, 1, 1 );
                 MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-                sprintf( str, "         %s %s %s %d  \n", strL, strM, strN, 1 );
+                sprintf( str, "         %s %s %s %d  \n", strL1, strM1, strN1, 1 );
                 MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
                 sprintf( str, "         </DataItem>\n" );
                 MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
-                sprintf( str, "          <DataItem Name=\"Q\" Dimensions=\"%s %s %s %s\" NumberType=\"Float\" Precision=\"4\" Format=\"HDF\">\n", strL, strM, strN, strNcube );
+                sprintf( str, "          <DataItem Name=\"Q\" Dimensions=\"%s %s %s %s\" NumberType=\"Float\" Precision=\"4\" Format=\"HDF\">\n", strL1, strM1, strN1, strNcube );
                 MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
                 sprintf( str, "          %s:/Q\n", fname );
                 MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
@@ -1606,10 +1580,18 @@ void templatePhdf5<N, Nvalue, M, Mvalue, T>::xdmfMultiBlock( TemplateForest<N, N
     }
 
     MPI_Barrier( MPI_COMM_WORLD );
+/*
+    MPI_File_sync(fp);
+    MPI_File_close( &fp );
 
+    MPI_File_open( MPI_COMM_WORLD, strname, MPI_MODE_APPEND | MPI_MODE_WRONLY, MPI_INFO_NULL, &fp );
+
+    //MPI_File_sync(fp);
+  */  
+    MPI_File_sync(fp);
     if ( my_rank == ( np - 1 ) )
     {
-        MPI_File_seek( fp, 0, MPI_SEEK_END );
+      //  MPI_File_seek( fp, 0, MPI_SEEK_END );
         sprintf( str, "  </Grid>\n" );
         MPI_File_write( fp, str, strlen( str ), MPI_CHAR, &status );
         sprintf( str, "      </Domain>   \n" );
@@ -1623,18 +1605,16 @@ void templatePhdf5<N, Nvalue, M, Mvalue, T>::xdmfMultiBlock( TemplateForest<N, N
 // implicitly calls this function, we experienced some problems on stampede with intel version of MPI
 // we decided to explicitly enforce this operation
 
-    MPI_File_sync(fp);
 
+    MPI_File_sync(fp);
     MPI_File_close( &fp );
 }
 
-#if ( 0 )
-//======================================================================
-#endif
 
 
-
-template class templatePhdf5<TREESIZE, real, PROCSIZE, uint, Tree<PROCSIZE, uint>>;
-template class templatePhdf5<TREESIZE, real, WSIZE, uint, FullTree<WSIZE, uint>>;
+//template class templatePhdf5<TREESIZE, real, PROCSIZE, uint, Tree<PROCSIZE, uint>>;
+template class templatePhdf5<TREESIZE, Q, PROCSIZE, uint, Tree<PROCSIZE, uint>>;
+//template class templatePhdf5<TREESIZE, real, WSIZE, uint, FullTree<WSIZE, uint>>;
+//template class templatePhdf5<TREESIZE, Q, WSIZE, uint, FullTree<WSIZE, uint>>;
 //template class templatePhdf5<TREESIZE, real, PROCSIZE, uint, FullTree<PROCSIZE, uint>>;
 

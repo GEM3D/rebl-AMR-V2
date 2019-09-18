@@ -188,13 +188,15 @@ set(HEADER_FILES "${dir}/src/include/typedefs.h"
 "${dir}/src/include/templatePhdf5.h"  
 "${dir}/src/include/templateForest.h"
 "${dir}/src/include/params.h"
+"${dir}/src/include/solver.h"
+"${dir}/src/include/interpolate.h"
 ) 
 
 #set (CMAKE_CXX_STANDARD 11)
 #set_property(TARGET tgt PROPERTY CXX_STANDARD 11)
 
 if(UNIX)
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}  -std=c++1y -g  ")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}  -std=c++1y -g -Wall ")
 #    SET(CMAKE_EXEC_LINKER_FLAGS "${CMAKE_EXEC_LINKER_FLAGS} -Wall -std=gnu++0x" )
 SET(CMAKE_EXEC_LINKER_FLAGS "${CMAKE_EXEC_LINKER_FLAGS}   -std=c++1y " )
 endif()

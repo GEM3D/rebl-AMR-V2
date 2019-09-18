@@ -1,7 +1,7 @@
 #include "templateForest.h"
 #include "definitions.h"
 #include <string.h>
-
+#define DEBUG 0
 
 // Methods 0 nd 1 are obsolete, not portable due to byte transfer
 // METHOD 0 >>  uses bool for symmetric Comm
@@ -16,10 +16,10 @@
 
 // template <size_t N, typename Nvalue, size_t M, typename Mvalue,  template< size_t L, typename Lvalue> class T >
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
-TemplateForest<N, Nvalue, M, Mvalue, T>::TemplateForest(int argcs,char *pArgs[], T &proc, real *length, real *coords, uint nx, uint ny, uint nz )
+TemplateForest<N, Nvalue, M, Mvalue, T>::TemplateForest( int argcs, char *pArgs[], T &proc, real *length, real *coords, uint nx, uint ny,
+                                                         uint nz )
 {
-
-/*!<part I, initialize the ancestor coords and length, just like we did for class tree*/
+    /*!<part I, initialize the ancestor coords and length, just like we did for class tree*/
 
     for ( uint i = 0; i < 3; i++ )
     {
@@ -29,17 +29,17 @@ TemplateForest<N, Nvalue, M, Mvalue, T>::TemplateForest(int argcs,char *pArgs[],
 
     real X[6], XC[3], len[3];
 
-    int initFlag=0;
+    int initFlag = 0;
 
-    if ( MPI_Initialized( &initFlag ) != MPI_SUCCESS  && Com.myrank==0 )
+    if ( MPI_Initialized( &initFlag ) != MPI_SUCCESS && Com.myrank == 0 )
     {
         cout << " Exit Code : " << ReblAmrGetErrorEnum( MPI_INIT_CHECK_FAIL ) << endl;
-        exit(1 );
+        exit( 1 );
     }
 
     if ( initFlag == 0 )
     {
-        if ( MPI_Init( &argcs, &pArgs ) != MPI_SUCCESS  && Com.myrank==0  )
+        if ( MPI_Init( &argcs, &pArgs ) != MPI_SUCCESS && Com.myrank == 0 )
         {
             cout << " Exit Code : " << ReblAmrGetErrorEnum( MPI_INIT_FAIL ) << endl;
             exit( 1 );
@@ -47,8 +47,8 @@ TemplateForest<N, Nvalue, M, Mvalue, T>::TemplateForest(int argcs,char *pArgs[],
     }
 
     MPIStartUp();
-    
-    checkInputParams(argcs,pArgs);
+
+    checkInputParams( argcs, pArgs );
 
     npx = nx;
     npy = ny;
@@ -67,31 +67,44 @@ TemplateForest<N, Nvalue, M, Mvalue, T>::TemplateForest(int argcs,char *pArgs[],
         npz = 2;
     }
 
+    // cell centered elements
+    px = npx - 1;
+    py = npy - 1;
+    pz = npz - 1;
+
+    // cell centered plus ghost
+    pxg = npx - 1 + 2;
+    pyg = npy - 1 + 2;
+    pzg = npz - 1 + 2;
+
     assignSeeds( length, proc );
 
     geom.construct( ancestorlength, ancestorcoords, 2, 2, 2 );
 
-//    geom.setToZero(  );
-
     // this error is important as to Remove singualt bits I tag that bit using one bit from far right hand side, i.e. key[0]=1
 
-    if ( (M + N) % 3 == 0 || M > N )
+    if ( ( M + N ) % 3 == 0 || M > N )
     {
-      cout <<RED<<ReblAmrGetErrorEnum(  COMBINED_SIZE ) << RESET<<endl;
-      exit( COMBINED_SIZE); 
- //       throw std::runtime_error( RED "(M+N) can not be a multiply of 3 since  one bit is needed to recover singularity in parallel" RESET );
+        cout << RED << ReblAmrGetErrorEnum( COMBINED_SIZE ) << RESET << endl;
+        exit( COMBINED_SIZE );
+        //       throw std::runtime_error( RED "(M+N) can not be a multiply of 3 since  one bit is needed to recover singularity in
+        // parallel" RESET );
     }
     if ( ZOLTAN_ON )
     {
         zz = Zoltan_Create( Com.mpicom );
     }
+
+    S.setGrid( npx, npy, npz );
+
+    commit();
 }
 
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
-void TemplateForest<N, Nvalue, M, Mvalue, T>::construct(int argcs,char *pArgs[], T &proc, real *length, real *coords, uint nx, uint ny, uint nz )
+void TemplateForest<N, Nvalue, M, Mvalue, T>::construct( int argcs, char *pArgs[], T &proc, real *length, real *coords, uint nx, uint ny,
+                                                         uint nz )
 {
-
-/*!<part I, initialize the ancestor coords and length, just like we did for class tree*/
+    /*!<part I, initialize the ancestor coords and length, just like we did for class tree*/
 
     for ( uint i = 0; i < 3; i++ )
     {
@@ -101,17 +114,17 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::construct(int argcs,char *pArgs[],
 
     real X[6], XC[3], len[3];
 
-    int initFlag=0;
+    int initFlag = 0;
 
-    if ( MPI_Initialized( &initFlag ) != MPI_SUCCESS  && Com.myrank==0 )
+    if ( MPI_Initialized( &initFlag ) != MPI_SUCCESS && Com.myrank == 0 )
     {
         cout << " Exit Code : " << ReblAmrGetErrorEnum( MPI_INIT_CHECK_FAIL ) << endl;
-        exit(1 );
+        exit( 1 );
     }
 
     if ( initFlag == 0 )
     {
-        if ( MPI_Init( &argcs, &pArgs ) != MPI_SUCCESS  && Com.myrank==0  )
+        if ( MPI_Init( &argcs, &pArgs ) != MPI_SUCCESS && Com.myrank == 0 )
         {
             cout << " Exit Code : " << ReblAmrGetErrorEnum( MPI_INIT_FAIL ) << endl;
             exit( 1 );
@@ -119,8 +132,8 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::construct(int argcs,char *pArgs[],
     }
 
     MPIStartUp();
-    
-    checkInputParams(argcs,pArgs);
+
+    checkInputParams( argcs, pArgs );
 
     npx = nx;
     npy = ny;
@@ -139,59 +152,70 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::construct(int argcs,char *pArgs[],
         npz = 2;
     }
 
+    // cell centered elements
+    px = npx - 1;
+    py = npy - 1;
+    pz = npz - 1;
+
+    // cell centered plus ghost
+    pxg = npx - 1 + 2;
+    pyg = npy - 1 + 2;
+    pzg = npz - 1 + 2;
+
     assignSeeds( length, proc );
 
-    cout<<"done"<<endl;
+    cout << "done" << endl;
     geom.construct( ancestorlength, ancestorcoords, 2, 2, 2 );
 
     // this error is important as to Remove singualt bits I tag that bit using one bit from far right hand side, i.e. key[0]=1
 
-    if ( (M + N) % 3 == 0 || M > N )
+    if ( ( M + N ) % 3 == 0 || M > N )
     {
-      cout <<RED<<ReblAmrGetErrorEnum(  COMBINED_SIZE ) << RESET<<endl;
-      exit( COMBINED_SIZE); 
- //       throw std::runtime_error( RED "(M+N) can not be a multiply of 3 since  one bit is needed to recover singularity in parallel" RESET );
+        cout << RED << ReblAmrGetErrorEnum( COMBINED_SIZE ) << RESET << endl;
+        exit( COMBINED_SIZE );
+        //       throw std::runtime_error( RED "(M+N) can not be a multiply of 3 since  one bit is needed to recover singularity in
+        // parallel" RESET );
     }
     if ( ZOLTAN_ON )
     {
         zz = Zoltan_Create( Com.mpicom );
     }
 
-}
+    S.setGrid( npx, npy, npz );
 
+    commit();
+}
 
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
-void TemplateForest<N, Nvalue, M, Mvalue, T>::checkInputParams(int argcs,char *pArgs[])
+void TemplateForest<N, Nvalue, M, Mvalue, T>::checkInputParams( int argcs, char *pArgs[] )
 {
-// check input parameters
-//
+    // check input parameters
+    //
 
-if ( (argcs < 4) && (Com.myrank==0) )
-{
-  cout <<RED<<ReblAmrGetErrorEnum( NUM_INPUT_ARGS )  << RESET<<endl;
-  exit( NUM_INPUT_ARGS );
-}
+    if ( ( argcs != 4 ) && ( Com.myrank == 0 ) )
+    {
+        cout << RED << ReblAmrGetErrorEnum( NUM_INPUT_ARGS ) << RESET << endl;
+        exit( NUM_INPUT_ARGS );
+    }
 
- int proclevel = atoi(pArgs[2]);
- int meshlevel = atoi(pArgs[3]);
+    int proclevel = atoi( pArgs[2] );
+    int meshlevel = atoi( pArgs[3] );
 
-  if ( proclevel > ( PROCSIZE / 3 ) &&  Com.myrank==0   )
-   {
-      cout <<RED<<ReblAmrGetErrorEnum( PROC_LEVEL ) << RESET<<endl;
-      exit(PROC_LEVEL); 
-  }
-  if ( meshlevel > ( TREESIZE / 3 ) &&  Com.myrank==0  )
-   {
-      cout <<RED<<ReblAmrGetErrorEnum( MESH_LEVEL ) << RESET<<endl;
-      exit(MESH_LEVEL); 
-  }
-
+    if ( proclevel > ( PROCSIZE / 3 ) && Com.myrank == 0 )
+    {
+        cout << RED << ReblAmrGetErrorEnum( PROC_LEVEL ) << RESET << endl;
+        exit( PROC_LEVEL );
+    }
+    if ( meshlevel > ( TREESIZE / 3 ) && Com.myrank == 0 )
+    {
+        cout << RED << ReblAmrGetErrorEnum( MESH_LEVEL ) << RESET << endl;
+        exit( MESH_LEVEL );
+    }
 }
 
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
 TemplateForest<N, Nvalue, M, Mvalue, T>::~TemplateForest()
 {
-
     if ( message != nullptr )
     {
         delete[] message;
@@ -210,38 +234,43 @@ TemplateForest<N, Nvalue, M, Mvalue, T>::~TemplateForest()
     {
         Zoltan_Destroy( &zz );
     }
-   
-    int initFlag;
 
-// free the duplicated MPI_COMM
+    MPI_Type_free( &contiguous );
 
-if(duplicated==1)
-{
-    MPI_Comm_free(&Com.mpicom);
-}
-    if ( MPI_Finalized( &initFlag ) != MPI_SUCCESS  && Com.myrank==0 )
-    {
-        cout << "failure in checking if MPI has already initialize" << endl;
-        exit( 1 );
-    }
+    
+        for(int i=0;i<9 && i!=3;i++){
+        MPI_Type_free( &( sendType[i] ) );
+        }
+/*
+        int initFlag;
 
-    // cout<<" init flag "<<initFlag<<endl;
-    if ( initFlag == 0 )
-    {
-        if ( MPI_Finalize() != MPI_SUCCESS  && Com.myrank== 0  )
+        // free the duplicated MPI_COMM
+
+        if ( duplicated == 1 )
         {
-            cout << " Exit Code : " << ReblAmrGetErrorEnum( MPI_FINALIZE_FAIL ) << endl;
+            MPI_Comm_free( &Com.mpicom );
+        }
+        if ( MPI_Finalized( &initFlag ) != MPI_SUCCESS && Com.myrank == 0 )
+        {
+            cout << "failure in checking if MPI has already initialize" << endl;
             exit( 1 );
         }
-    }
 
-
+        // cout<<" init flag "<<initFlag<<endl;
+        if ( initFlag == 0 )
+        {
+            if ( MPI_Finalize() != MPI_SUCCESS && Com.myrank == 0 )
+            {
+                cout << " Exit Code : " << ReblAmrGetErrorEnum( MPI_FINALIZE_FAIL ) << endl;
+                exit( 1 );
+            }
+        }
+    */
 }
 
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
 void TemplateForest<N, Nvalue, M, Mvalue, T>::assignSeeds( real *length, T &proc )
 {
-
     uint count = 0;
     real X[6], XC[3], len[3];
 
@@ -262,7 +291,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::assignSeeds( real *length, T &proc
 
             // regrdless of the topology, we need a tree in tree list
 
-            trees.push_back( Tree<N, Nvalue>( len, XC ) );
+            trees.push_back( Tree<N, Nvalue>( len, XC, npx, npy, npz ) );
 
             seeds.push_back( it->first );
 
@@ -270,14 +299,12 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::assignSeeds( real *length, T &proc
             count++;
         }
     }
-
     // cout<<"seedsize "<<seeds.size()<<"count  "<<count<<endl;
 }
 
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
 uint TemplateForest<N, Nvalue, M, Mvalue, T>::getTotalSize()
 {
-    
     uint size = 0;
 
     for ( auto it = trees.begin(); it != trees.end(); it++ )
@@ -293,7 +320,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::encodeGeometry()
 {
     morton<N> key;
     morton<M> seedkey;
-    auto it3 = seeds.begin();
+    auto      it3 = seeds.begin();
 
     uint index;
     bool bol;
@@ -318,7 +345,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::encodeGeometry()
                 xyz[2] = it4->second[3 * j + 3];
 
                 ( *it ).convertCoordToMorton( xyz, key );
-                  //            cout<<"key "<<key<<endl;
+                //              cout<<"key "<<key<<endl;
             }
         }
         it3 = std::next( it3, 1 );
@@ -345,51 +372,16 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::refineEachTree( uint nlevel )
 //
 
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
-void TemplateForest<N, Nvalue, M, Mvalue, T>::updateGeom( T &proc, real *geom_xyz, uint n)
-{
- resetGeom();
-  auto it2 = trees.begin();
-
-    for ( auto it = geom.begin(); it != geom.end(); it++ )
-    {
-        // empty the geom Trees coords ...
-        //
-        // realloc with size zero is not equivalent to free, as realloc return a pointer
-        //    if ( it->second != nullptr )
-        {
-            //  free(it->second);
-            it->second = (real *)realloc( it->second, 0 );
-            // set this to nullptr just to make sure
-            it->second = nullptr;
-        }
-        // empty the mortonSTL
-        ( *it2 ).clearMortonSTL();
-        it2 = std::next( it2, 1 );
-    }
-
-
-    // cout<<"moveGeom "<<n<<endl;
-    // move geom calls assign geom
-   assignGeom( proc, geom_xyz, n );
-
-}
-
-template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
 void TemplateForest<N, Nvalue, M, Mvalue, T>::moveGeom( T &proc, real *geom_xyz, uint n, real x[3] )
 {
     // need to get rid of the encoded geometry first
 
-    /* commented out for multi geometry 
- 
     for ( auto it = trees.begin(); it != trees.end(); it++ )
     {
         ( *it ).mortonSTLclear();
     }
 
-    */
     auto it2 = trees.begin();
-
-    resetGeom();
 
     for ( auto it = geom.begin(); it != geom.end(); it++ )
     {
@@ -413,223 +405,11 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::moveGeom( T &proc, real *geom_xyz,
         geom_xyz[3 * i] += x[0];
         geom_xyz[3 * i + 1] += x[1];
         geom_xyz[3 * i + 2] += x[2];
-//   cout<<" geom  "<<geom_xyz[3*i+1]<<endl;
-    }
-
-     cout<<"moveGeom "<<n<<endl;
-    // move geom calls assign geom
-   assignGeom( proc, geom_xyz, n );
-}
-
-
-template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
-void TemplateForest<N, Nvalue, M, Mvalue, T>::moveGeom( T &proc, GeomSTL *GM, uint nSTL, real *x , int * activeList )
-{
-    // need to get rid of the encoded geometry first
-
-    /* commented out for multi geometry 
- 
-    for ( auto it = trees.begin(); it != trees.end(); it++ )
-    {
-        ( *it ).mortonSTLclear();
-    }
-
-    */
-    auto it2 = trees.begin();
-
-    resetGeom();
-
-    for ( auto it = geom.begin(); it != geom.end(); it++ )
-    {
-        // empty the geom Trees coords ...
-        //
-        // realloc with size zero is not equivalent to free, as realloc return a pointer
-        //    if ( it->second != nullptr )
-        {
-            //  free(it->second);
-            it->second = (real *)realloc( it->second, 0 );
-            // set this to nullptr just to make sure
-            it->second = nullptr;
-        }
-        // empty the mortonSTL
-        ( *it2 ).clearMortonSTL();
-        it2 = std::next( it2, 1 );
-    }
-
-for(int j=0;j<nSTL && activeList!=0;j++)
-{
-   for ( uint i = 0; i < GM[j].geom_nn; i++ )
-    {
-        GM[j].geom_xyz[3 * i] += x[j*3+0];
-        GM[j].geom_xyz[3 * i + 1] += x[j*3+1];
-        GM[j].geom_xyz[3 * i + 2] += x[j*3+2];
-//   cout<<" geom  "<<geom_xyz[3*i+1]<<endl;
-    }
-}
-//     cout<<"moveGeom "<<n<<endl;
-    // move geom calls assign geom
-   assignGeom( proc, GM,nSTL,x,activeList  );
-}
-
-template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
-void TemplateForest<N, Nvalue, M, Mvalue, T>::updateGeom( T &proc, GeomSTL *GM, uint nSTL, real *x ,int *activeList)
-{
- resetGeom();
-  auto it2 = trees.begin();
-
-    for ( auto it = geom.begin(); it != geom.end(); it++ )
-    {
-        // empty the geom Trees coords ...
-        //
-        // realloc with size zero is not equivalent to free, as realloc return a pointer
-        //    if ( it->second != nullptr )
-        {
-            //  free(it->second);
-            it->second = (real *)realloc( it->second, 0 );
-            // set this to nullptr just to make sure
-            it->second = nullptr;
-        }
-        // empty the mortonSTL
-        ( *it2 ).clearMortonSTL();
-        it2 = std::next( it2, 1 );
-    }
-
-
-    // cout<<"moveGeom "<<n<<endl;
-    // move geom calls assign geom
- 
-
-   assignGeom( proc, GM,nSTL,x,activeList  );
-}
-
-
-
-
-
-#if(0)
-template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
-void TemplateForest<N, Nvalue, M, Mvalue, T>::moveGeomDebug( T &proc, real *geom_xyz, uint n, real x[3] )
-{
-    // need to get rid of the encoded geometry first
-
-    for ( auto it = trees.begin(); it != trees.end(); it++ )
-    {
-        ( *it ).mortonSTLclear();
-    }
-
-    auto it2 = trees.begin();
-
-    resetGeom();
-
-   // cout<<" geom size  "<<geom.size()<<endl;
-
-    for ( auto it = geom.begin(); it != geom.end(); it++ )
-    {
-        // empty the geom Trees coords ...
-        //
-        // realloc with size zero is not equivalent to free, as realloc return a pointer
-        //    if ( it->second != nullptr )
-        {
-
-            //  free(it->second);
-            it->second = (real *)realloc( it->second, 0 );
-            // set this to nullptr just to make sure
-            it->second = nullptr;
-
-        }
-        // empty the mortonSTL
-        ( *it2 ).clearMortonSTL();
-        it2 = std::next( it2, 1 );
-    }
-
-    for ( uint i = 0; i < n; i++ )
-    {
-        geom_xyz[3 * i] += x[0];
-        geom_xyz[3 * i + 1] += x[1];
-        geom_xyz[3 * i + 2] += x[2];
-//   cout<<" geom  "<<geom_xyz[3*i+1]<<endl;
     }
 
     // cout<<"moveGeom "<<n<<endl;
     // move geom calls assign geom
-
-   assignGeom( proc, geom_xyz, n );
-
-}
-#endif
-
-
-
-
-#if(0)
-template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
-void TemplateForest<N, Nvalue, M, Mvalue, T>::moveGeomDebug( T &proc, real *geom_xyz, uint n, real x[3] )
-{
-    // need to get rid of the encoded geometry first
-
-    for ( auto it = trees.begin(); it != trees.end(); it++ )
-    {
-        ( *it ).mortonSTLclear();
-    }
-
-    auto it2 = trees.begin();
-
-    resetGeom();
-
-   // cout<<" geom size  "<<geom.size()<<endl;
-
-    for ( auto it = geom.begin(); it != geom.end(); it++ )
-    {
-        // empty the geom Trees coords ...
-        //
-        // realloc with size zero is not equivalent to free, as realloc return a pointer
-        //    if ( it->second != nullptr )
-        {
-
-            //  free(it->second);
-            it->second = (real *)realloc( it->second, 0 );
-            // set this to nullptr just to make sure
-            it->second = nullptr;
-
-        }
-        // empty the mortonSTL
-        ( *it2 ).clearMortonSTL();
-        it2 = std::next( it2, 1 );
-    }
-
-    for ( uint i = 0; i < n; i++ )
-    {
-        geom_xyz[3 * i] += x[0];
-        geom_xyz[3 * i + 1] += x[1];
-        geom_xyz[3 * i + 2] += x[2];
-//   cout<<" geom  "<<geom_xyz[3*i+1]<<endl;
-    }
-
-    // cout<<"moveGeom "<<n<<endl;
-    // move geom calls assign geom
-
-   assignGeom( proc, geom_xyz, n );
-
-}
-#endif
-
-template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
-void TemplateForest<N, Nvalue, M, Mvalue, T>::resetGeom(  )
-{
-    // cout<<"size of geom tree"<<geom.size()<<endl;
-
-    morton<M> key;
-
-    // it is cheaper to just clear this rather than destroy and create teh object
-    geom.clearMesh();
-
-    for ( auto it = seeds.begin(); it != seeds.end(); it++ )
-    {
-        key = *it;
-        geom.insertKey( key );
-         //  cout<<RED<<Com.myrank<<" "<<key<<RESET<<endl;
-    }
-
+    assignGeom( proc, geom_xyz, n );
 }
 
 // this function along with getListEachTree can be improved by using encoding
@@ -640,9 +420,9 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::assignGeom( T &proc, real *geom_xy
     // cout<<"size of geom tree"<<geom.size()<<endl;
 
     morton<M> key;
-    real xyz[6];
-    uint count = 0;
-/*
+    real      xyz[6];
+    uint      count = 0;
+
     // it is cheaper to just clear this rather than destroy and create teh object
     geom.clearMesh();
 
@@ -650,10 +430,10 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::assignGeom( T &proc, real *geom_xy
     {
         key = *it;
         geom.insertKey( key );
-           cout<<RED<<Com.myrank<<" "<<key<<RESET<<endl;
+        //   cout<<RED<<Com.myrank<<" "<<key<<RESET<<endl;
     }
-*/
-  cout<<"geom size before "<<geom.size()<<endl;
+
+//  cout<<"geom size "<<geom.size()<<endl;
 #if ( 1 )
 
     for ( auto it = geom.begin(); it != geom.end(); it++ )
@@ -673,10 +453,9 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::assignGeom( T &proc, real *geom_xy
 
         proc.enclosingBox( key, xyz );
 
-          //cout<<" rank "<<Com.myrank<<" "<<xyz[0]<<" "<<xyz[1]<<" "<<xyz[2]<<" "<<xyz[3]<<" "<<xyz[4]<<" "<<xyz[5]<<endl;
+        //   cout<<" rank "<<Com.myrank<<" "<<xyz[0]<<" "<<xyz[1]<<" "<<xyz[2]<<" "<<xyz[3]<<" "<<xyz[4]<<" "<<xyz[5]<<endl;
 
         //     cout<<RED<<" "<<Com.myrank<<" "<<key<<RESET<<endl;
-
 
         count = 0;
 
@@ -694,7 +473,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::assignGeom( T &proc, real *geom_xy
             }
         }
 
-        //cout<<RED<<" number of points of the geometry inside each seed = "<<count<<RESET<<endl;
+      //  cout << RED << " number of points of the geometry inside each seed = " << count << RESET << endl;
 
         if ( count > 0 )
         {
@@ -704,7 +483,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::assignGeom( T &proc, real *geom_xy
             it->second[0] = count;
 
             // cout<<count<<endl;
-             //cout<<"count "<<(it->second)[0]<<endl;
+            // cout<<"count"<<(it->second)[0]<<endl;
 
             count = 0;
 
@@ -728,9 +507,6 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::assignGeom( T &proc, real *geom_xy
         }
     }
 
-//cout<< "start of encoding "<<endl; 
-
-
 #endif
     double t1 = MPI_Wtime();
 
@@ -738,258 +514,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::assignGeom( T &proc, real *geom_xy
 
     double t2 = MPI_Wtime();
 
-  //cout<<"Only encodimg "<<t2-t1<<endl;
-
-#if ( 0 )
-
-    uint sum = 0;
-    for ( auto it = geom.begin(); it != geom.end(); it++ )
-    {
-        if ( it->second != nullptr )
-        {
-            sum = sum + it->second[0];
-        }
-    }
-
-  cout << "number of points " << sum << endl;
-#endif
-
-    cout<<"geom_size"<<geom.size()<<endl;
-    //cout<<" end of encoding " <<endl;
-}
-
-
-
-template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
-void TemplateForest<N, Nvalue, M, Mvalue, T>::assignGeom( T &proc,GeomSTL *GM,  uint nSTL, real *x , int * activeList )
-{
-    // cout<<"size of geom tree"<<geom.size()<<endl;
-
-    morton<M> key;
-    real xyz[6];
-    uint count = 0;
-/*
-    // it is cheaper to just clear this rather than destroy and create teh object
-    geom.clearMesh();
-
-    for ( auto it = seeds.begin(); it != seeds.end(); it++ )
-    {
-        key = *it;
-        geom.insertKey( key );
-           cout<<RED<<Com.myrank<<" "<<key<<RESET<<endl;
-    }
-*/
-  cout<<"geom size before "<<geom.size()<<endl;
-#if ( 1 )
-
-    for ( auto it = geom.begin(); it != geom.end(); it++ )
-    {
-        key = it->first;
-        /*
-                 if(fixedlevel==0)
-                {
-                proc.enclosingBox( key, xyz );
-                }
-                else
-                {
-
-                proc.enclosingBoxFixedLevel( key,fixedlevel ,xyz );
-                }
-        */
-
-        proc.enclosingBox( key, xyz );
-
-          //cout<<" rank "<<Com.myrank<<" "<<xyz[0]<<" "<<xyz[1]<<" "<<xyz[2]<<" "<<xyz[3]<<" "<<xyz[4]<<" "<<xyz[5]<<endl;
-
-        //     cout<<RED<<" "<<Com.myrank<<" "<<key<<RESET<<endl;
-
-
-        count = 0;
-
-        for(int k=0;k<nSTL && activeList!=0 ;k++)
-        { 
-        for ( uint j = 0; j < GM[k].geom_nn; j++ )
-        {
-            if ( GM[k].geom_xyz[3 * j + 0] >= xyz[0] && GM[k].geom_xyz[3 * j + 0] <= xyz[1] )
-            {
-                if ( GM[k].geom_xyz[3 * j + 1] >= xyz[2] && GM[k].geom_xyz[3 * j + 1] <= xyz[3] )
-                {
-                    if ( GM[k].geom_xyz[3 * j + 2] >= xyz[4] && GM[k].geom_xyz[3 * j + 2] <= xyz[5] )
-
-                    {
-                        count++;
-                    }
-                }
-            }
-        }
-        }
-//        cout<<RED<<" number of points of the geometry inside each seed = "<<count<<RESET<<endl;
-
-        if ( count > 0 )
-        {
-            it->second = (real *)realloc( it->second, ( 3 * count + 1 ) * sizeof( real ) );
-            // cout<<(it->second)<<endl;
-
-            it->second[0] = count;
-
-            // cout<<count<<endl;
-             //cout<<"count "<<(it->second)[0]<<endl;
-
-            count = 0;
-
-        for(int k=0;k<nSTL && activeList!=0 ;k++)
-        {
-            for ( uint j = 0; j < GM[k].geom_nn; j++ )
-            {
-                if ( GM[k].geom_xyz[3 * j + 0] >= xyz[0] && GM[k].geom_xyz[3 * j + 0] <= xyz[1] )
-                {
-                    if ( GM[k].geom_xyz[3 * j + 1] >= xyz[2] && GM[k].geom_xyz[3 * j + 1] <= xyz[3] )
-                    {
-                        if ( GM[k].geom_xyz[3 * j + 2] >= xyz[4] && GM[k].geom_xyz[3 * j + 2] <= xyz[5] )
-                        {
-                            it->second[3 * count + 1] = GM[k].geom_xyz[3 * j + 0];
-                            it->second[3 * count + 2] = GM[k].geom_xyz[3 * j + 1];
-                            it->second[3 * count + 3] = GM[k].geom_xyz[3 * j + 2];
-
-                            count++;
-                        }
-                    }
-                }
-            }
-         }
-        }
-    }
-
-//cout<< "start of encoding "<<endl; 
-
-
-#endif
-    double t1 = MPI_Wtime();
-
-    encodeGeometry();
-
-    double t2 = MPI_Wtime();
-
-  //cout<<"Only encodimg "<<t2-t1<<endl;
-
-#if (1 )
-
-    uint sum = 0;
-    for ( auto it = geom.begin(); it != geom.end(); it++ )
-    {
-        if ( it->second != nullptr )
-        {
-            sum = sum + it->second[0];
-        }
-    }
-
-  cout << "number of points " << sum << endl;
-#endif
-
-    cout<<"geom_size"<<geom.size()<<endl;
-    //cout<<" end of encoding " <<endl;
-}
-
-
-
-#if(0)
-template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
-void TemplateForest<N, Nvalue, M, Mvalue, T>::assignGeom( T &proc, GeomSTL *GM,int nSTL )
-{
-    // cout<<"size of geom tree"<<geom.size()<<endl;
-
-    morton<M> key;
-    real xyz[6];
-    uint count = 0;
-/*
-    // it is cheaper to just clear this rather than destroy and create teh object
-    geom.clearMesh();
-
-    for ( auto it = seeds.begin(); it != seeds.end(); it++ )
-    {
-        key = *it;
-        geom.insertKey( key );
-           cout<<RED<<Com.myrank<<" "<<key<<RESET<<endl;
-    }
-*/
-//  cout<<"geom size "<<geom.size()<<endl;
-#if ( 1 )
-
-    for ( auto it = geom.begin(); it != geom.end(); it++ )
-    {
-        key = it->first;
-        proc.enclosingBox( key, xyz );
-
-          //cout<<" rank "<<Com.myrank<<" "<<xyz[0]<<" "<<xyz[1]<<" "<<xyz[2]<<" "<<xyz[3]<<" "<<xyz[4]<<" "<<xyz[5]<<endl;
-
-        //     cout<<RED<<" "<<Com.myrank<<" "<<key<<RESET<<endl;
-
-        count = 0;
-      
-        for(int k=0;k<nSTL;k++)
-       {
-        for ( uint j = 0; j < GM[k].geom_nn; j++ )
-        {
-            if ( GM[k].geom_xyz[3 * j + 0] >= xyz[0] && GM[k].geom_xyz[3 * j + 0] <= xyz[1] )
-            {
-                if ( GM[k].geom_xyz[3 * j + 1] >= xyz[2] && GM[k].geom_xyz[3 * j + 1] <= xyz[3] )
-                {
-                    if ( GM[k].geom_xyz[3 * j + 2] >= xyz[4] && GM[k].geom_xyz[3 * j + 2] <= xyz[5] )
-                    {
-                        count++;
-                    }
-                }
-            }
-        }
-       }
-        //cout<<RED<<" number of points of the geometry inside each seed = "<<count<<RESET<<endl;
-
-        if ( count > 0 )
-        {
-            it->second = (real *)realloc( it->second, ( 3 * count + 1 ) * sizeof( real ) );
-            // cout<<(it->second)<<endl;
-
-            it->second[0] = count;
-
-            // cout<<count<<endl;
-             //cout<<"count "<<(it->second)[0]<<endl;
-
-         count = 0;
-
-        for(int k=0;k<nSTL;k++)
-        {
-            for ( uint j = 0; j < GM[k].geom_nn; j++ )
-            {
-                if ( GM[k].geom_xyz[3 * j + 0] >= xyz[0] && GM[k].geom_xyz[3 * j + 0] <= xyz[1] )
-                {
-                    if ( GM[k].geom_xyz[3 * j + 1] >= xyz[2] && GM[k].geom_xyz[3 * j + 1] <= xyz[3] )
-                    {
-                        if ( GM[k].geom_xyz[3 * j + 2] >= xyz[4] && GM[k].geom_xyz[3 * j + 2] <= xyz[5] )
-                        {
-                            it->second[3 * count + 1] = GM[k].geom_xyz[3 * j + 0];
-                            it->second[3 * count + 2] = GM[k].geom_xyz[3 * j + 1];
-                            it->second[3 * count + 3] = GM[k].geom_xyz[3 * j + 2];
-
-                            count++;
-                        }
-                    }
-                }
-            }
-        } 
-       }
-    }
-
-//cout<< "start of encoding "<<endl; 
-
-
-#endif
-    double t1 = MPI_Wtime();
-
-    encodeGeometry();
-
-    double t2 = MPI_Wtime();
-
-  //cout<<"Only encodimg "<<t2-t1<<endl;
+    //  cout<<"Only encodimg"<<t2-t1<<endl;
 
 #if ( 1 )
 
@@ -1002,14 +527,11 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::assignGeom( T &proc, GeomSTL *GM,i
         }
     }
 
-  //cout << "number of points " << sum << endl;
+//  cout << "number of points " << sum << endl;
 #endif
 
-    //cout<<"geom_size"<<geom.size()<<endl;
-    //cout<<" end of encoding " <<endl;
+    // cout<<"geom_size"<<geom.size()<<endl;
 }
-
-#endif
 
 //===========================================================
 //
@@ -1023,7 +545,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::getListEachTree()
     morton<N> key;
 
     morton<M> seedkey;
-    auto it3 = seeds.begin();
+    auto      it3 = seeds.begin();
 
     uint index;
     bool bol;
@@ -1080,9 +602,9 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::getListEachTree()
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
 bool TemplateForest<N, Nvalue, M, Mvalue, T>::isInSeed( morton<M> &key, uint *counter )
 {
-    bool bol = false;
+    bool bol   = false;
     uint count = 0;
-    *counter = 0;
+    *counter   = 0;
 
     for ( auto it = seeds.begin(); it != seeds.end(); it++ )
     {
@@ -1119,8 +641,8 @@ template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
 void TemplateForest<N, Nvalue, M, Mvalue, T>::getDirections( morton<N + M> &key, uint combinedlevel, vector<uint> &directions )
 {
     directions.clear();
-    uint mylevel;
-    bool bol1, bol2;
+    uint          mylevel;
+    bool          bol1, bol2;
     morton<N + M> kt1, kt2;
     // level(key, &mylevel );
     bol2 = false;
@@ -1168,8 +690,8 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::recoverAllZeroSingularity( morton<
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
 void TemplateForest<N, Nvalue, M, Mvalue, T>::combinedLevel( const morton<N + M> &key, uint *level )
 {
-    *level = ( N + M ) / 3;
-    uint rem = ( N + M ) % 3;
+    *level    = ( N + M ) / 3;
+    uint rem  = ( N + M ) % 3;
     uint iend = ( N + M ) / 3;
 
     /*! to prevent unnecesary bit operation, the morton code is placed from starting from  left hand side*/
@@ -1248,17 +770,16 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::findSeedLevelForRcvdMessage( const
 }
 
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
-void TemplateForest
-<N, Nvalue, M, Mvalue, T>::findSeedLevelForRcvdMessage( const morton<N + M> &key, uint *mylevel, FullTree<M, Mvalue> &proc )
+void TemplateForest<N, Nvalue, M, Mvalue, T>::findSeedLevelForRcvdMessage( const morton<N + M> &key, uint *mylevel,
+                                                                           FullTree<M, Mvalue> &proc )
 {
-
     *mylevel = proc.getLevel();
     // cout<<" ==============  "<<(*mylevel)<<endl;
 }
 
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
-void TemplateForest
-<N, Nvalue, M, Mvalue, T>::constructSeedKeyForRcvdMessage( const morton<N + M> &key, const uint &seedlevel, morton<M> &seedkey )
+void TemplateForest<N, Nvalue, M, Mvalue, T>::constructSeedKeyForRcvdMessage( const morton<N + M> &key, const uint &seedlevel,
+                                                                              morton<M> &seedkey )
 {
     seedkey = 0;
     for ( uint i = 0; i < 3 * seedlevel; i++ )
@@ -1268,13 +789,13 @@ void TemplateForest
 }
 
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
-void TemplateForest
-<N, Nvalue, M, Mvalue, T>::constructElementKeyForRcvdMessage( const morton<N + M> &key, const uint &seedlevel, morton<N> &elementkey )
+void TemplateForest<N, Nvalue, M, Mvalue, T>::constructElementKeyForRcvdMessage( const morton<N + M> &key, const uint &seedlevel,
+                                                                                 morton<N> &elementkey )
 {
     // cout << "seedlevel inside" << seedlevel << endl;
     for ( uint i = 0; i < N; i++ )
     {
-        elementkey[N - i - 1] = key[M + N - 3 * ( seedlevel ) - i - 1];
+        elementkey[N - i - 1] = key[M + N - 3 * (seedlevel)-i - 1];
     }
     // do not forget the tag for the singularity
     elementkey[0] = key[0];
@@ -1315,14 +836,6 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::getMaxSeedsLevel( T &proc )
     }
     // cout<<GREEN "MAXSEEDLEVEL "<<maxseedlevel<<RESET<<endl;
 }
-
-template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
-uint TemplateForest<N, Nvalue, M, Mvalue, T>::getMaxSeedLevel() 
-{
- 
-return maxseedlevel;
-}
-
 
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
 void TemplateForest<N, Nvalue, M, Mvalue, T>::setMaxProcLevel( const uint refinelevel )
@@ -1367,16 +880,17 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::findFlipLevel( morton<N + M> key, 
 }
 
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
-void TemplateForest<N, Nvalue, M, Mvalue, T>::flipForNbr( morton<N + M> &key, uint *mylevel, uint *changedirectionlevel, uint *direction )
+void TemplateForest<N, Nvalue, M, Mvalue, T>::flipForNbr( morton<N + M> &key, uint *combinedlevel, uint *changedirectionlevel,
+                                                          uint *direction )
 {
-    //    cout << "combinedlevel, changelevel and direction = " << *mylevel << "\t" << *changedirectionlevel << "\t" << *direction << endl;
+    // cout << " changelevel and direction = " << *combinedlevel << "\t" << *changedirectionlevel << "\t" << *direction << endl;
 
     uint NM = N + M;
     // cout<<"NM= "<<NM<<endl;
     // if changedirectionlevel==0 that node is a boundary node
     if ( *changedirectionlevel > 0 )
     {
-        for ( uint i = ( *changedirectionlevel ); i <= ( *mylevel ); i++ )
+        for ( uint i = ( *changedirectionlevel ); i <= ( *combinedlevel ); i++ )
         {
             //      cout<<"index "<<(NM-3*(i-1)-(*direction)-1)<<endl;
 
@@ -1410,10 +924,9 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::flipForNbr( morton<N + M> &key, ui
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
 void TemplateForest<N, Nvalue, M, Mvalue, T>::getTotalMeshSize() /*!< creates distributed (acalable) graph for communication */
 {
-
-//    unsigned long long meshSize;
+    //    unsigned long long meshSize;
     unsigned long long forestsize = getTotalSize();
-    int comsize;
+    int                comsize;
 
     //  cout<<" "<<forestsize<<endl;
 
@@ -1423,7 +936,6 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::getTotalMeshSize() /*!< creates di
 
     if ( Com.myrank == 0 )
     {
-
         std::string filename = "meshSize";
         filename.append( to_string( Com.myrank ) );
         ofstream myfile;
@@ -1447,13 +959,13 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::getTotalMeshSize() /*!< creates di
 
 #if ( 0 )
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
-void TemplateForest
-<N, Nvalue, M, Mvalue, T>::getNbrSeedLevel( morton<N + M> &combinedkey, uint topologylevel, uint *nbrseedlevel, Tree<M, Mvalue> &proc )
+void TemplateForest<N, Nvalue, M, Mvalue, T>::getNbrSeedLevel( morton<N + M> &combinedkey, uint topologylevel, uint *nbrseedlevel,
+                                                               Tree<M, Mvalue> &proc )
 {
-    morton<M> kt = 0;
-    uint l1, mylevel;
-    bool bol = false;
-    const uint NM = N + M;
+    morton<M>  kt = 0;
+    uint       l1, mylevel;
+    bool       bol = false;
+    const uint NM  = N + M;
 
     //  cout << RED << topologylevel << RESET << endl;
 
@@ -1494,13 +1006,13 @@ void TemplateForest
 #endif
 
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
-void TemplateForest
-<N, Nvalue, M, Mvalue, T>::getNbrSeedLevel( morton<N + M> &combinedkey, uint topologylevel, uint *nbrseedlevel, Tree<M, Mvalue> &proc )
+void TemplateForest<N, Nvalue, M, Mvalue, T>::getNbrSeedLevel( morton<N + M> &combinedkey, uint topologylevel, uint *nbrseedlevel,
+                                                               Tree<M, Mvalue> &proc )
 {
-    morton<M> kt = 0;
-    uint l1, mylevel;
-    bool bol = false;
-    const uint NM = N + M;
+    morton<M>  kt = 0;
+    uint       l1, mylevel;
+    bool       bol = false;
+    const uint NM  = N + M;
 
     //  cout << RED << topologylevel << RESET << endl;
 
@@ -1528,27 +1040,26 @@ void TemplateForest
 
     if ( proc.find( kt ) == proc.end() )
     {
-    
         cout << " Exit Code : " << ReblAmrGetErrorEnum( NO_SEED ) << endl;
-        exit(1);  
-//throw std::runtime_error( "seed not found in the proc" );
+        exit( 1 );
+        // throw std::runtime_error( "seed not found in the proc" );
     }
     else
     {
-
         proc.level( kt, &mylevel );
     }
 
     *nbrseedlevel = mylevel;
 
+    //   cout<<CYAN" kt "<<kt<<" level " <<mylevel<<RESET<<endl;
+
     // return(bol);
 }
 
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
-void TemplateForest
-<N, Nvalue, M, Mvalue, T>::getNbrSeedLevel( morton<N + M> &combinedkey, uint topologylevel, uint *nbrseedlevel, FullTree<M, Mvalue> &proc )
+void TemplateForest<N, Nvalue, M, Mvalue, T>::getNbrSeedLevel( morton<N + M> &combinedkey, uint topologylevel, uint *nbrseedlevel,
+                                                               FullTree<M, Mvalue> &proc )
 {
-
     *nbrseedlevel = topologylevel;
 }
 
@@ -1569,7 +1080,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::getElemNbrs( Tree<M, Mvalue> &proc
 {
     nbr.clear();
     morton<M> nbrkey = key, sibkey = key, kt, kb;
-    uint mylevel, siblevel, nbrlevel, changedirectionlevel, direction;
+    uint      mylevel, siblevel, nbrlevel, changedirectionlevel, direction;
     // assume that the gut has siblings of same level
     // each direction
     // siblings frist
@@ -1605,7 +1116,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::getElemNbrs( Tree<M, Mvalue> &proc
             //  cout << key << " " << direction << " " << BLUE << sibkey << " " << mylevel << " " << siblevel << RESET << "  " <<
             // itd->second[0]
             //      << endl;
-            //cout << " sibling " << sibkey << endl;
+            cout << " sibling " << sibkey << endl;
         }
 #endif
         if ( siblevel > mylevel )
@@ -1622,7 +1133,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::getElemNbrs( Tree<M, Mvalue> &proc
 #if ( DEBUG )
                 if ( Com.myrank == forprint )
                 {
-                 //   cout << key << " "
+                    cout << key << " "
                          << "sibling has higher level " << kn[l] << endl;
                 }
 #endif
@@ -1660,10 +1171,10 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::getElemNbrs( Tree<M, Mvalue> &proc
         {
             nbrkey = key;
 
-// cout<<"key "<<key<<endl;
+            // cout<<"key "<<key<<endl;
 
-// exclude the boundary elemnts that chanagedirectionlevel=0 for them
-// taken care of in tree function
+            // exclude the boundary elemnts that chanagedirectionlevel=0 for them
+            // taken care of in tree function
 
 #if ( DEBUG )
             cout << "before " << nbrkey << endl;
@@ -1686,8 +1197,8 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::getElemNbrs( Tree<M, Mvalue> &proc
                 // "<<direction<<RESET <<" "<< itd2->second[0] <<endl;
                 if ( itd2 != proc.end() )
                 {
-                   // cout << GREEN << "key " << key << " nbrkey " << nbrkey << " mylevel " << mylevel << " nbrlevel " << nbrlevel
-                     //    << " direction " << direction << RESET << " " << itd2->second[0] << endl;
+                  //  cout << GREEN << "key " << key << " nbrkey " << nbrkey << " mylevel " << mylevel << " nbrlevel " << nbrlevel
+                  //       << " direction " << direction << RESET << " " << itd2->second[0] << endl;
                 }
 
                 //  cout<<" this dir "<<directions.at(j)<<endl;
@@ -1712,7 +1223,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::getElemNbrs( Tree<M, Mvalue> &proc
                 kt[M - 3 * ( mylevel - 1 ) - 1] = 0;
                 kt[M - 3 * ( mylevel - 1 ) - 2] = 0;
                 kt[M - 3 * ( mylevel - 1 ) - 3] = 0;
-                nbrlevel = nbrlevel - 1;
+                nbrlevel                        = nbrlevel - 1;
 
 #if ( 0 )
                 if ( Com.myrank == forprint )
@@ -1745,7 +1256,6 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::getElemNbrs( Tree<M, Mvalue> &proc
 #if ( DEBUG )
                 if ( Com.myrank == forprint )
                 {
-
                     for ( uint l = 0; l < 4; l++ )
                     {
                         auto itd3 = proc.find( kn[l] );
@@ -1755,8 +1265,8 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::getElemNbrs( Tree<M, Mvalue> &proc
                         // "<<direction<<RESET <<" "<< itd2->second[0] <<endl;
                         if ( itd3 != proc.end() )
                         {
-                            cout << GREEN << "key " << key << " nbrkey " << kn[l] << " mylevel " << mylevel << " nbrlevel " << nbrlevel
-                                 << " direction " << direction << RESET << " " << itd3->second[0] << endl;
+                        /*    cout << GREEN << "key " << key << " nbrkey " << kn[l] << " mylevel " << mylevel << " nbrlevel " << nbrlevel
+                                << " direction " << direction << RESET << " " << itd3->second[0] << endl;*/
                         }
                     }
                 }
@@ -1796,10 +1306,8 @@ template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
 void TemplateForest<N, Nvalue, M, Mvalue, T>::comPatternConstruct( Tree<M, Mvalue> &proc )
 {
     morton<M> seedkey;
-    uint mylevel;
-    uint myrank = Com.myrank;
-     destination.clear();
-
+    uint      mylevel;
+    uint      myrank = Com.myrank;
 
     bitvector<M> nbr;
 
@@ -1815,12 +1323,11 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::comPatternConstruct( Tree<M, Mvalu
     for ( uint i = 0; i < seeds.size(); i++ )
     {
         seedkey = ( *it );
-//   cout << YELLOW << seedkey << endl;
+        //   cout << YELLOW << seedkey << endl;
 
 #if ( DEBUG )
         if ( Com.myrank == 37 )
         {
-
             cout << "============== seed==========\n " << seedkey << endl;
             /*
                for ( uint j = 0; j < nbr.size(); j++ )
@@ -1861,8 +1368,8 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::comPatternConstruct( Tree<M, Mvalu
         it = std::next( it, 1 );
     }
 
-    message = new vector<bitset<M + N>>[destination.size()];
-    request = new MPI_Request[destination.size()];
+    message  = new vector<bitset<M + N>>[destination.size()];
+    request  = new MPI_Request[destination.size()];
     request1 = new MPI_Request[destination.size()];
 
 #if ( 0 )
@@ -1870,11 +1377,11 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::comPatternConstruct( Tree<M, Mvalu
     if ( Com.myrank == 17 )
     {
         cout << "=========================================" << endl;
-        //cout << GREEN << Com.myrank << RESET << endl;
+        cout << GREEN << Com.myrank << RESET << endl;
 
         for ( uint i = 0; i < destination.size(); i++ )
         {
-            //cout << RED << "rank " << destination.at( i ) << RESET << endl;
+            cout << RED << "rank " << destination.at( i ) << RESET << endl;
         }
         cout << "=========================================" << endl;
     }
@@ -1884,16 +1391,16 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::comPatternConstruct( Tree<M, Mvalu
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
 void TemplateForest<N, Nvalue, M, Mvalue, T>::comPatternConstruct( FullTree<M, Mvalue> &proc, vector<uint> &Nbrs )
 {
-
     uint co = 0;
 
     for ( uint i = 0; i < Nbrs.size(); i++ )
     {
         destination.push_back( Nbrs.at( i ) );
+        cout << " neighbors " << Nbrs.at( i ) << endl;
     }
 
-    message = new vector<bitset<M + N>>[destination.size()];
-    request = new MPI_Request[destination.size()];
+    message  = new vector<bitset<M + N>>[destination.size()];
+    request  = new MPI_Request[destination.size()];
     request1 = new MPI_Request[destination.size()];
 
     // cout<<"nbrs_size"<<Nbrs.size()<<endl;
@@ -1927,40 +1434,40 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::comPatternConstruct( FullTree<M, M
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
 void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 {
-    const uint NM = N + M;
-    morton<NM> combinedkey = 0, ktcom;
-    morton<N> key, kt1, nbrkey;
-    morton<M> seedkey, seednbrkey = 0, kt, kt3;
-    auto it3 = seeds.begin();
-    uint index;
-    bool bol;
-    real xyz[6];
+    const uint   NM          = N + M;
+    morton<NM>   combinedkey = 0, ktcom;
+    morton<N>    key, kt1, nbrkey;
+    morton<M>    seedkey, seednbrkey = 0, kt, kt3;
+    auto         it3 = seeds.begin();
+    uint         index;
+    bool         bol;
+    real         xyz[6];
     bitvector<N> boundaryElem;
-    uint mylevel, changedirectionlevel, direction;
-    uint topologylevel, nbrseedlevel, nbrlevel, complevel, nbrcomplevel, nbrtopologylevel, combinedlevel, localcombinedlevel;
-    uint counter;
+    uint         mylevel, changedirectionlevel, direction;
+    uint         topologylevel, nbrseedlevel, nbrlevel, complevel, nbrcomplevel, nbrtopologylevel, combinedlevel, localcombinedlevel;
+    uint         counter;
     vector<uint> directions;
     it3 = seeds.begin();
     vector<bitset<M + N>> message[destination.size()];
-    vector<uint> dest;
-    vector<uint> source;
-    uint idx;
-    int size;
-    int flag = 1;
-    morton<M + N> rcvkey;
-    uint seedlevel;
-    morton<N> elementkey;
-    uint idex2;
-    uint elementlevel, recvmessagecombinedlevel;
+    vector<uint>          dest;
+    vector<uint>          source;
+    uint                  idx;
+    int                   size;
+    int                   flag = 1;
+    morton<M + N>         rcvkey;
+    uint                  seedlevel;
+    morton<N>             elementkey;
+    uint                  idex2;
+    uint                  elementlevel, recvmessagecombinedlevel;
     //    morton<M + N> *       sendbuff[destination.size()];
     //    morton<M + N> *       recvbuff[destination.size()];
-    vector<uint> start;
-    vector<uint> end;
-    uint istart, iend;
-    uint counter3, counter2, counter5;
-    MPI_Request request[destination.size()], request1[destination.size()], request0;
-    MPI_Status status;
-    bool sb = 0, rb = 0;
+    vector<uint>  start;
+    vector<uint>  end;
+    uint          istart, iend;
+    uint          counter3, counter2, counter5;
+    MPI_Request   request[destination.size()], request1[destination.size()], request0;
+    MPI_Status    status;
+    bool          sb = 0, rb = 0;
     morton<N + M> tempkey;
 
 #if ( 0 )
@@ -1974,11 +1481,11 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
         ////  cout << RED << "prod id " << Com.myrank << "  seed " << ( *it ) << RESET << endl;
         //   myfile << "prod id " << Com.myrank << "  " << con++ << "  seed " << ( *it ) << endl;
     }
-// myfile << " topology size " << proc.size() << endl;
+    // myfile << " topology size " << proc.size() << endl;
 
 #endif
     bool *sendbuff[destination.size()];
-    uint con = 0;
+    uint  con = 0;
     bool *recvbuff[destination.size()];
 
     // extract the boundary elements for each tree from the tagged list
@@ -2064,7 +1571,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 
                     for ( uint j = 0; j < 3 * mylevel; j++ )
                     {
-                        combinedkey[NM - 3 * ( topologylevel ) - j - 1] = key[N - j - 1];
+                        combinedkey[NM - 3 * (topologylevel)-j - 1] = key[N - j - 1];
                     }
 
                     ktcom = combinedkey;
@@ -2099,7 +1606,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 
                             for ( uint k = 0; k < N; k++ )
                             {
-                                nbrkey[N - k - 1] = combinedkey[NM - 3 * ( nbrseedlevel ) - 1 - k];
+                                nbrkey[N - k - 1] = combinedkey[NM - 3 * (nbrseedlevel)-1 - k];
                             }
                             //  cout << " nbrkey " << nbrkey << endl;
 
@@ -2135,7 +1642,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
                                     // this condition imples level is lower no need for modification and search, I commented it out
                                     //                                nbrlevel                     = mylevel-1;
                                     // ( *it2 ).level( it4->first, &nbrlevel );
-                                    nbrlevel = nbrlevel - 1;
+                                    nbrlevel                     = nbrlevel - 1;
                                     nbrkey[N - 3 * nbrlevel - 1] = 0;
                                     nbrkey[N - 3 * nbrlevel - 2] = 0;
                                     nbrkey[N - 3 * nbrlevel - 3] = 0;
@@ -2218,9 +1725,9 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 
 #endif
 
-// need a communication pattern need to send zero size message if communication is not required  need to add local balance criteria  need to
-// loop over and do this again in while loop
-// get size of message for each proc send the required information to the neighboring processes
+        // need a communication pattern need to send zero size message if communication is not required  need to add local balance criteria
+        // need to loop over and do this again in while loop get size of message for each proc send the required information to the
+        // neighboring processes
 
 #if ( 1 )
         for ( uint i = 0; i < destination.size(); i++ )
@@ -2278,7 +1785,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
         for ( auto it = trees.begin(); it != trees.end(); it++ )
         {
             istart = start.at( counter2 );
-            iend = end.at( counter2 );
+            iend   = end.at( counter2 );
             ( *it ).refineRefineList( istart, iend );
         }
 #endif
@@ -2517,48 +2024,48 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 //
 //
 
-#elif( METHOD == 1 )
+#elif ( METHOD == 1 )
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
 void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 {
     // cout << "character solving" << endl;
-    const uint NM = N + M;
-    morton<NM> combinedkey = 0, ktcom;
-    morton<N> key, kt1, nbrkey;
-    morton<M> seedkey, seednbrkey = 0, kt, kt3;
-    auto it3 = seeds.begin();
-    uint index;
-    bool bol;
-    real xyz[6];
+    const uint   NM          = N + M;
+    morton<NM>   combinedkey = 0, ktcom;
+    morton<N>    key, kt1, nbrkey;
+    morton<M>    seedkey, seednbrkey = 0, kt, kt3;
+    auto         it3 = seeds.begin();
+    uint         index;
+    bool         bol;
+    real         xyz[6];
     bitvector<N> boundaryElem;
-    uint mylevel, changedirectionlevel, direction;
-    uint topologylevel, nbrseedlevel, nbrlevel, complevel, nbrcomplevel, nbrtopologylevel, combinedlevel, localcombinedlevel;
-    uint counter;
+    uint         mylevel, changedirectionlevel, direction;
+    uint         topologylevel, nbrseedlevel, nbrlevel, complevel, nbrcomplevel, nbrtopologylevel, combinedlevel, localcombinedlevel;
+    uint         counter;
     vector<uint> directions;
     it3 = seeds.begin();
     vector<bitset<M + N>> message[destination.size()];
-    vector<uint> dest;
-    vector<uint> source;
-    uint idx;
-    int size;
-    int flag = 1;
-    morton<M + N> rcvkey;
-    uint seedlevel;
-    morton<N> elementkey;
-    uint idex2;
-    uint elementlevel, recvmessagecombinedlevel;
+    vector<uint>          dest;
+    vector<uint>          source;
+    uint                  idx;
+    int                   size;
+    int                   flag = 1;
+    morton<M + N>         rcvkey;
+    uint                  seedlevel;
+    morton<N>             elementkey;
+    uint                  idex2;
+    uint                  elementlevel, recvmessagecombinedlevel;
     //    morton<M + N> *       sendbuff[destination.size()];
     //    morton<M + N> *       recvbuff[destination.size()];
-    vector<uint> start;
-    vector<uint> end;
-    uint istart, iend;
-    uint counter3, counter2, counter5;
-    MPI_Request request[destination.size()], request1[destination.size()], request0;
-    MPI_Status status;
-    bool sb = 0, rb = 0;
+    vector<uint>  start;
+    vector<uint>  end;
+    uint          istart, iend;
+    uint          counter3, counter2, counter5;
+    MPI_Request   request[destination.size()], request1[destination.size()], request0;
+    MPI_Status    status;
+    bool          sb = 0, rb = 0;
     morton<N + M> tempkey;
 #if ( 0 )
-    std::string filename = "rank";
+    std::string   filename = "rank";
     filename.append( to_string( Com.myrank ) );
     ofstream myfile;
     myfile.open( filename );
@@ -2571,7 +2078,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
     myfile << " topology size " << proc.size() << endl;
 #endif
 
-    uint con = 0;
+    uint  con = 0;
     char *sendbuff[destination.size()];
     char *recvbuff[destination.size()];
 
@@ -2615,7 +2122,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
         }
 
         // separates the list between local boundary and non-local boundary
-        it3 = seeds.begin();
+        it3      = seeds.begin();
 
 #if ( 1 )
         counter5 = 0;
@@ -2658,7 +2165,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 
                     for ( uint j = 0; j < 3 * mylevel; j++ )
                     {
-                        combinedkey[NM - 3 * ( topologylevel ) - j - 1] = key[N - j - 1];
+                        combinedkey[NM - 3 * (topologylevel)-j - 1] = key[N - j - 1];
                     }
 
                     ktcom = combinedkey;
@@ -2693,7 +2200,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 
                             for ( uint k = 0; k < N; k++ )
                             {
-                                nbrkey[N - k - 1] = combinedkey[NM - 3 * ( nbrseedlevel ) - 1 - k];
+                                nbrkey[N - k - 1] = combinedkey[NM - 3 * (nbrseedlevel)-1 - k];
                             }
                             //  cout << " nbrkey " << nbrkey << endl;
 
@@ -2729,7 +2236,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
                                     // this condition imples level is lower no need for modification and search, I commented it out
                                     //                                nbrlevel                     = mylevel-1;
                                     // ( *it2 ).level( it4->first, &nbrlevel );
-                                    nbrlevel = nbrlevel - 1;
+                                    nbrlevel                     = nbrlevel - 1;
                                     nbrkey[N - 3 * nbrlevel - 1] = 0;
                                     nbrkey[N - 3 * nbrlevel - 2] = 0;
                                     nbrkey[N - 3 * nbrlevel - 3] = 0;
@@ -2812,9 +2319,9 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 
 #endif
 
-// need a communication pattern need to send zero size message if communication is not required  need to add local balance criteria  need to
-// loop over and do this again in while loop
-// get size of message for each proc send the required information to the neighboring processes
+        // need a communication pattern need to send zero size message if communication is not required  need to add local balance criteria
+        // need to loop over and do this again in while loop get size of message for each proc send the required information to the
+        // neighboring processes
 
 #if ( 1 )
         for ( uint i = 0; i < destination.size(); i++ )
@@ -2872,7 +2379,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
         for ( auto it = trees.begin(); it != trees.end(); it++ )
         {
             istart = start.at( counter2 );
-            iend = end.at( counter2 );
+            iend   = end.at( counter2 );
             ( *it ).refineRefineList( istart, iend );
         }
 #endif
@@ -2966,7 +2473,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 
                             if ( it7 == seeds.end() )
                             {
-                                //cout << RED << "myrank " << Com.myrank << " " << seedkey << RESET << endl;
+                                cout << RED << "myrank " << Com.myrank << " " << seedkey << RESET << endl;
 
                                 throw std::runtime_error( RED "seed not found in Balance Comm" RESET );
                             }
@@ -3106,48 +2613,48 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
     //   end.clear();
     // assigne recieved elements to corresponding lists if needed
 }
-#elif( METHOD == 2 )
+#elif ( METHOD == 2 )
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
 void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 {
     // cout << "character solving" << endl;
-    const uint NM = N + M;
-    morton<NM> combinedkey = 0, ktcom;
-    morton<N> key, kt1, nbrkey;
-    morton<M> seedkey, seednbrkey = 0, kt, kt3;
-    auto it3 = seeds.begin();
-    uint index;
-    bool bol;
-    real xyz[6];
+    const uint   NM          = N + M;
+    morton<NM>   combinedkey = 0, ktcom;
+    morton<N>    key, kt1, nbrkey;
+    morton<M>    seedkey, seednbrkey = 0, kt, kt3;
+    auto         it3 = seeds.begin();
+    uint         index;
+    bool         bol;
+    real         xyz[6];
     bitvector<N> boundaryElem;
-    uint mylevel, changedirectionlevel, direction;
-    uint topologylevel, nbrseedlevel, nbrlevel, complevel, nbrcomplevel, nbrtopologylevel, combinedlevel, localcombinedlevel;
-    uint counter;
+    uint         mylevel, changedirectionlevel, direction;
+    uint         topologylevel, nbrseedlevel, nbrlevel, complevel, nbrcomplevel, nbrtopologylevel, combinedlevel, localcombinedlevel;
+    uint         counter;
     vector<uint> directions;
     it3 = seeds.begin();
     vector<bitset<M + N>> message[destination.size()];
-    vector<uint> dest;
-    vector<uint> source;
-    uint idx;
-    int size;
-    int flag = 1;
-    morton<M + N> rcvkey;
-    uint seedlevel;
-    morton<N> elementkey;
-    uint idex2;
-    uint elementlevel, recvmessagecombinedlevel;
+    vector<uint>          dest;
+    vector<uint>          source;
+    uint                  idx;
+    int                   size;
+    int                   flag = 1;
+    morton<M + N>         rcvkey;
+    uint                  seedlevel;
+    morton<N>             elementkey;
+    uint                  idex2;
+    uint                  elementlevel, recvmessagecombinedlevel;
     //    morton<M + N> *       sendbuff[destination.size()];
     //    morton<M + N> *       recvbuff[destination.size()];
-    vector<uint> start;
-    vector<uint> end;
-    uint istart, iend;
-    uint counter3, counter2, counter5;
-    MPI_Request request[destination.size()], request1[destination.size()], request0;
-    MPI_Status status;
-    int sb = 0, rb = 0;
+    vector<uint>  start;
+    vector<uint>  end;
+    uint          istart, iend;
+    uint          counter3, counter2, counter5;
+    MPI_Request   request[destination.size()], request1[destination.size()], request0;
+    MPI_Status    status;
+    int           sb = 0, rb = 0;
     morton<N + M> tempkey;
 #if ( 0 )
-    std::string filename = "rank";
+    std::string   filename = "rank";
     filename.append( to_string( Com.myrank ) );
     ofstream myfile;
     myfile.open( filename );
@@ -3160,7 +2667,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
     myfile << " topology size " << proc.size() << endl;
 #endif
 
-    uint con = 0;
+    uint  con = 0;
     char *sendbuff[destination.size()];
     char *recvbuff[destination.size()];
 
@@ -3204,7 +2711,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
         }
 
         // separates the list between local boundary and non-local boundary
-        it3 = seeds.begin();
+        it3      = seeds.begin();
 
 #if ( 1 )
         counter5 = 0;
@@ -3248,7 +2755,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 
                     for ( uint j = 0; j < 3 * mylevel; j++ )
                     {
-                        combinedkey[NM - 3 * ( topologylevel ) - j - 1] = key[N - j - 1];
+                        combinedkey[NM - 3 * (topologylevel)-j - 1] = key[N - j - 1];
                     }
 
                     ktcom = combinedkey;
@@ -3283,7 +2790,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 
                             for ( uint k = 0; k < N; k++ )
                             {
-                                nbrkey[N - k - 1] = combinedkey[NM - 3 * ( nbrseedlevel ) - 1 - k];
+                                nbrkey[N - k - 1] = combinedkey[NM - 3 * (nbrseedlevel)-1 - k];
                             }
                             //  cout << " nbrkey " << nbrkey << endl;
 
@@ -3319,7 +2826,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
                                     // this condition imples level is lower no need for modification and search, I commented it out
                                     //                                nbrlevel                     = mylevel-1;
                                     // ( *it2 ).level( it4->first, &nbrlevel );
-                                    nbrlevel = nbrlevel - 1;
+                                    nbrlevel                     = nbrlevel - 1;
                                     nbrkey[N - 3 * nbrlevel - 1] = 0;
                                     nbrkey[N - 3 * nbrlevel - 2] = 0;
                                     nbrkey[N - 3 * nbrlevel - 3] = 0;
@@ -3405,7 +2912,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 
 #endif
 
-// do a neighborhood comm to tell the nbrs the size of the message to be recieved
+        // do a neighborhood comm to tell the nbrs the size of the message to be recieved
 
 #if ( 1 )
         for ( uint i = 0; i < destination.size(); i++ )
@@ -3527,7 +3034,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 
                             if ( it7 == seeds.end() )
                             {
-                               // cout << RED << "myrank " << Com.myrank << " " << seedkey << RESET << endl;
+                                cout << RED << "myrank " << Com.myrank << " " << seedkey << RESET << endl;
 
                                 throw std::runtime_error( RED "seed not found in Balance Comm" RESET );
                             }
@@ -3670,23 +3177,23 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
     // assigne recieved elements to corresponding lists if needed
 }
 
-#elif( METHOD == 3 )
+#elif ( METHOD == 3 )
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
 void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 {
     // cout << "character solving" << endl;
-    const uint NM = N + M;
-    morton<NM> combinedkey = 0, ktcom;
-    morton<N> key, kt1, nbrkey;
-    morton<M> seedkey, seednbrkey = 0, kt, kt3;
-    auto it3 = seeds.begin();
-    uint index;
-    bool bol;
-    real xyz[6];
+    const uint   NM          = N + M;
+    morton<NM>   combinedkey = 0, ktcom;
+    morton<N>    key, kt1, nbrkey;
+    morton<M>    seedkey, seednbrkey = 0, kt, kt3;
+    auto         it3 = seeds.begin();
+    uint         index;
+    bool         bol;
+    real         xyz[6];
     bitvector<N> boundaryElem;
-    uint mylevel, changedirectionlevel, direction;
-    uint topologylevel, nbrseedlevel, nbrlevel, complevel, nbrcomplevel, nbrtopologylevel, combinedlevel, localcombinedlevel;
-    uint counter;
+    uint         mylevel, changedirectionlevel, direction;
+    uint         topologylevel, nbrseedlevel, nbrlevel, complevel, nbrcomplevel, nbrtopologylevel, combinedlevel, localcombinedlevel;
+    uint         counter;
     vector<uint> directions;
     it3 = seeds.begin();
     //    vector<bitset<M + N>> message[destination.size()];
@@ -3702,35 +3209,35 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 
     //  message[0].push_back(0);
     //
-    vector<uint> dest;
-    vector<uint> source;
-    uint idx;
-    int size;
-    int flag = 1;
+    vector<uint>  dest;
+    vector<uint>  source;
+    uint          idx;
+    int           size;
+    int           flag = 1;
     morton<M + N> rcvkey;
-    uint seedlevel;
-    morton<N> elementkey;
-    uint idex2;
-    uint elementlevel, recvmessagecombinedlevel;
+    uint          seedlevel;
+    morton<N>     elementkey;
+    uint          idex2;
+    uint          elementlevel, recvmessagecombinedlevel;
     //    morton<M + N> *       sendbuff[destination.size()];
     //    morton<M + N> *       recvbuff[destination.size()];
     vector<uint> start;
     vector<uint> end;
-    uint istart, iend;
-    uint counter3, counter2, counter5;
-    MPI_Request request0;
+    uint         istart, iend;
+    uint         counter3, counter2, counter5;
+    MPI_Request  request0;
 
     //    MPI_Request *request=new MPI_Request[destination.size()];
     //    MPI_Request *request1=new MPI_Request[destination.size()];
     //    request = malloc( sizeof(MPI_REQUEST)*destination.size());
     //    request1 = malloc( sizeof(MPI_REQUEST)*destination.size());
 
-    MPI_Status status;
-    short sb = 0, rb = 0;
-    bool mybool;
+    MPI_Status    status;
+    short         sb = 0, rb = 0;
+    bool          mybool;
     morton<N + M> tempkey;
 #if ( DEBUG )
-    std::string filename = "rank";
+    std::string   filename = "rank";
     filename.append( to_string( Com.myrank ) );
     ofstream myfile;
     myfile.open( filename );
@@ -3750,7 +3257,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 
 #endif
 
-    uint con = 0;
+    uint  con = 0;
     char *sendbuff[destination.size()];
     char *recvbuff[destination.size()];
 
@@ -3777,7 +3284,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
     while ( loopbool )
     {
         // start out by setting loopbool=0
-        mybool = false;
+        mybool   = false;
         loopbool = false;
         counter2 = 0;
 
@@ -3786,7 +3293,6 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
         uint counter4 = 0;
         for ( auto it = trees.begin(); it != trees.end(); it++ )
         {
-
             for ( auto i = ( *it ).Rbegin(); i != ( *it ).Rend(); i++ )
             {
                 auto p = ( *it ).readRefineList( i );
@@ -3807,7 +3313,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
         }
 
         // separates the list between local boundary and non-local boundary
-        it3 = seeds.begin();
+        it3      = seeds.begin();
 
 #if ( 1 )
         counter5 = 0;
@@ -3858,7 +3364,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 
                     for ( uint j = 0; j < 3 * mylevel; j++ )
                     {
-                        combinedkey[NM - 3 * ( topologylevel ) - j - 1] = key[N - j - 1];
+                        combinedkey[NM - 3 * (topologylevel)-j - 1] = key[N - j - 1];
                     }
 
                     ktcom = combinedkey;
@@ -3912,7 +3418,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 
                             for ( uint k = 0; k < N; k++ )
                             {
-                                nbrkey[N - k - 1] = combinedkey[NM - 3 * ( nbrseedlevel ) - 1 - k];
+                                nbrkey[N - k - 1] = combinedkey[NM - 3 * (nbrseedlevel)-1 - k];
                             }
 //  cout << " nbrkey " << nbrkey << endl;
 #if ( DEBUG )
@@ -3952,7 +3458,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
                                     // this condition imples level is lower no need for modification and search, I commented it out
                                     //                                nbrlevel                     = mylevel-1;
                                     // ( *it2 ).level( it4->first, &nbrlevel );
-                                    nbrlevel = nbrlevel - 1;
+                                    nbrlevel                     = nbrlevel - 1;
                                     nbrkey[N - 3 * nbrlevel - 1] = 0;
                                     nbrkey[N - 3 * nbrlevel - 2] = 0;
                                     nbrkey[N - 3 * nbrlevel - 3] = 0;
@@ -3966,7 +3472,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
                                 // cout<<"inside"<<endl;
                                 if ( ( *it2 ).find( nbrkey ) == ( *it2 ).end() )
                                 {
-                                    //cout << Com.myrank << " " << nbrkey << " direction " << direction << " level " << nbrlevel << endl;
+                                    cout << Com.myrank << " " << nbrkey << " direction " << direction << " level " << nbrlevel << endl;
                                     throw std::runtime_error( "error in finding key refinement" RESET );
                                 }
 
@@ -3992,7 +3498,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 
                             else
                             {
-// sorts for communication
+                                // sorts for communication
 
 #if ( 1 )
 // prepare for communication, pack all the elements with the destination, sender is   my_rank
@@ -4023,12 +3529,12 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 
 #endif
 
-// do a neighborhood comm to tell the nbrs the size of the message to be recieved
+        // do a neighborhood comm to tell the nbrs the size of the message to be recieved
 
 #if ( 1 )
         for ( uint i = 0; i < destination.size(); i++ )
         {
-           // sending with boolean is not portable, use characters
+            // sending with boolean is not portable, use characters
 
             //    sendbuff[i] = new char[message[i].size() * ( M + N )];
 
@@ -4038,7 +3544,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
             // if(sendbuff[i]==NULL && message[i].size()!=0)
             if ( sendbuff[i] == NULL )
             {
-               // cout << " myrank " << Com.myrank << " " << message[i].size() << endl;
+                cout << " myrank " << Com.myrank << " " << message[i].size() << endl;
                 throw std::runtime_error( "not able to allocate sendbuf" );
             }
             for ( uint j = 0; j < message[i].size(); j++ )
@@ -4089,7 +3595,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
             // if(recvbuff[i]==NULL && size!=0)
             if ( recvbuff[i] == NULL )
             {
-              //  cout << " myrank " << Com.myrank << " " << size << endl;
+                cout << " myrank " << Com.myrank << " " << size << endl;
                 throw std::runtime_error( "bad alloc in recv buffer" );
             }
 
@@ -4151,8 +3657,8 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 
                 if ( it7 == seeds.end() )
                 {
-                  //  cout << " p_id  " << Com.myrank << " " << rcvkey << "  " << recvmessagecombinedlevel << endl;
-                  //  cout << RED << "myrank " << Com.myrank << " " << seedkey << RESET << endl;
+                    cout << " p_id  " << Com.myrank << " " << rcvkey << "  " << recvmessagecombinedlevel << endl;
+                    cout << RED << "myrank " << Com.myrank << " " << seedkey << RESET << endl;
                     //  cout << "myrank " << Com.myrank << " " << seedkey << endl;
 
                     throw std::runtime_error( RED "seed not found in Balance Comm" RESET );
@@ -4248,21 +3754,21 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
         counter3 = 0;
 
         // switch the tag for initial list
-if(OVERLAP==1)
-{
-        auto it = trees.begin();
-
-        for ( uint i1 = 0; i1 < trees.size(); i1++ )
+        if ( OVERLAP == 1 )
         {
-            ( *it ).refineRefineList( initialList[i1] );
-            it = std::next( it, 1 );
-        }
+            auto it = trees.begin();
 
-        for ( uint i = 0; i < trees.size(); i++ )
-        {
-            initialList[i].clear();
+            for ( uint i1 = 0; i1 < trees.size(); i1++ )
+            {
+                ( *it ).refineRefineList( initialList[i1] );
+                it = std::next( it, 1 );
+            }
+
+            for ( uint i = 0; i < trees.size(); i++ )
+            {
+                initialList[i].clear();
+            }
         }
-}
         // for debug for now do the refinem
         MPI_Wait( &request0, MPI_STATUS_IGNORE );
 
@@ -4298,12 +3804,12 @@ if(OVERLAP==1)
         {
 #if ( 1 )
             cout << RED << " loopbool " << loopbool << " rb " << rb << " sb " << sb << RESET << endl;
-            cout<<" count " <<intracount<<endl;
+            cout << " count " << intracount << endl;
 #endif
         }
     }
 
-            cout <<  " -------------------------------------- " << endl;
+    cout << " -------------------------------------- " << endl;
 #if ( DEBUG )
     myfile.close();
 #endif
@@ -4321,46 +3827,46 @@ if(OVERLAP==1)
     // cout<<"============================"<<RED<<Com.myrank<<" "<<intracount<<endl;
 }
 
-#elif( METHOD == 4 )
+#elif ( METHOD == 4 )
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
 void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 {
     // cout << "character solving" << endl;
-    const uint NM = N + M;
-    morton<NM> combinedkey = 0, ktcom;
-    morton<N> key, kt1, nbrkey;
-    morton<M> seedkey, seednbrkey = 0, kt, kt3;
-    auto it3 = seeds.begin();
-    uint index;
-    bool bol;
-    real xyz[6];
+    const uint   NM          = N + M;
+    morton<NM>   combinedkey = 0, ktcom;
+    morton<N>    key, kt1, nbrkey;
+    morton<M>    seedkey, seednbrkey = 0, kt, kt3;
+    auto         it3 = seeds.begin();
+    uint         index;
+    bool         bol;
+    real         xyz[6];
     bitvector<N> boundaryElem;
-    uint mylevel, changedirectionlevel, direction;
-    uint topologylevel, nbrseedlevel, nbrlevel, complevel, nbrcomplevel, nbrtopologylevel, combinedlevel, localcombinedlevel;
-    uint counter;
+    uint         mylevel, changedirectionlevel, direction;
+    uint         topologylevel, nbrseedlevel, nbrlevel, complevel, nbrcomplevel, nbrtopologylevel, combinedlevel, localcombinedlevel;
+    uint         counter;
     vector<uint> directions;
     it3 = seeds.begin();
-    vector<uint> dest;
-    vector<uint> source;
-    uint idx;
-    int size;
-    int flag = 1;
+    vector<uint>  dest;
+    vector<uint>  source;
+    uint          idx;
+    int           size;
+    int           flag = 1;
     morton<M + N> rcvkey;
-    uint seedlevel;
-    morton<N> elementkey;
-    uint idex2;
-    uint elementlevel, recvmessagecombinedlevel;
-    vector<uint> start;
-    vector<uint> end;
-    uint istart, iend;
-    uint counter3, counter2, counter5;
-    MPI_Request request0;
-    MPI_Status status;
-    short sb = 0, rb = 0;
-    bool mybool;
+    uint          seedlevel;
+    morton<N>     elementkey;
+    uint          idex2;
+    uint          elementlevel, recvmessagecombinedlevel;
+    vector<uint>  start;
+    vector<uint>  end;
+    uint          istart, iend;
+    uint          counter3, counter2, counter5;
+    MPI_Request   request0;
+    MPI_Status    status;
+    short         sb = 0, rb = 0;
+    bool          mybool;
     morton<N + M> tempkey;
 #if ( DEBUG )
-    std::string filename = "rank";
+    std::string   filename = "rank";
     filename.append( to_string( Com.myrank ) );
     ofstream myfile;
     myfile.open( filename );
@@ -4375,7 +3881,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 
     int *dispS = nullptr;
     int *dispR = nullptr;
-    uint con = 0;
+    uint con   = 0;
     //    char *sendbuff[destination.size()];
     //    char *recvbuff[destination.size()];
     char *sendbuff = nullptr;
@@ -4383,8 +3889,8 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 
     sendbuff = new char[1];
     recvbuff = new char[1];
-    dispS = new int[1];
-    dispR = new int[1];
+    dispS    = new int[1];
+    dispR    = new int[1];
 
     int sendSize[destination.size()];
     // for debug
@@ -4407,7 +3913,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
     while ( loopbool )
     {
         // start out by setting loopbool=0
-        mybool = false;
+        mybool   = false;
         loopbool = false;
         counter2 = 0;
 
@@ -4416,7 +3922,6 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
         uint counter4 = 0;
         for ( auto it = trees.begin(); it != trees.end(); it++ )
         {
-
             for ( auto i = ( *it ).Rbegin(); i != ( *it ).Rend(); i++ )
             {
                 auto p = ( *it ).readRefineList( i );
@@ -4437,7 +3942,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
         }
 
         // separates the list between local boundary and non-local boundary
-        it3 = seeds.begin();
+        it3      = seeds.begin();
 
 #if ( 1 )
         counter5 = 0;
@@ -4487,7 +3992,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 
                     for ( uint j = 0; j < 3 * mylevel; j++ )
                     {
-                        combinedkey[NM - 3 * ( topologylevel ) - j - 1] = key[N - j - 1];
+                        combinedkey[NM - 3 * (topologylevel)-j - 1] = key[N - j - 1];
                     }
 
                     ktcom = combinedkey;
@@ -4540,7 +4045,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 
                             for ( uint k = 0; k < N; k++ )
                             {
-                                nbrkey[N - k - 1] = combinedkey[NM - 3 * ( nbrseedlevel ) - 1 - k];
+                                nbrkey[N - k - 1] = combinedkey[NM - 3 * (nbrseedlevel)-1 - k];
                             }
 //  cout << " nbrkey " << nbrkey << endl;
 #if ( DEBUG )
@@ -4580,7 +4085,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
                                     // this condition imples level is lower no need for modification and search, I commented it out
                                     //                                nbrlevel                     = mylevel-1;
                                     // ( *it2 ).level( it4->first, &nbrlevel );
-                                    nbrlevel = nbrlevel - 1;
+                                    nbrlevel                     = nbrlevel - 1;
                                     nbrkey[N - 3 * nbrlevel - 1] = 0;
                                     nbrkey[N - 3 * nbrlevel - 2] = 0;
                                     nbrkey[N - 3 * nbrlevel - 3] = 0;
@@ -4659,7 +4164,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
                                 myfile << " combined key pushed back  " << combinedkey << "level " << combinedlevel << endl;
                                 myfile << "*********************************  " << endl;
 #endif
-//                       cout <<"message "<< message[i].at(0) << RESET << endl;
+                                //                       cout <<"message "<< message[i].at(0) << RESET << endl;
 
 #endif
                             }
@@ -4702,7 +4207,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 
         // dispS=new int [destination.size()];
 
-        dispS = (int *)realloc( dispS, destination.size() * sizeof( int ) );
+        dispS    = (int *)realloc( dispS, destination.size() * sizeof( int ) );
         dispS[0] = 0;
 
         for ( int i = 1; i < destination.size(); i++ )
@@ -4722,7 +4227,6 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
         // do a neighborhood comm to tell the nbrs the size of the message to be recieved
         for ( uint i = 0; i < destination.size(); i++ )
         {
-
             for ( uint j = 0; j < message[i].size(); j++ )
             {
                 tempkey = message[i].at( j );
@@ -4834,8 +4338,8 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 
             if ( it7 == seeds.end() )
             {
-               // cout << " p_id  " << Com.myrank << " " << rcvkey << "  " << recvmessagecombinedlevel << endl;
-                // cout << RED << "myrank " << Com.myrank << " " << seedkey << RESET << endl;
+                cout << " p_id  " << Com.myrank << " " << rcvkey << "  " << recvmessagecombinedlevel << endl;
+                cout << RED << "myrank " << Com.myrank << " " << seedkey << RESET << endl;
                 //  cout << "myrank " << Com.myrank << " " << seedkey << endl;
 
                 throw std::runtime_error( RED "seed not found in Balance Comm" RESET );
@@ -4986,6 +4490,573 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
     // cout<<"============================"<<RED<<Com.myrank<<" "<<intracount<<endl;
 }
 
+#elif(0)
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
+{
+    // cout << "character solving" << endl;
+    const uint   NM          = N + M;
+    morton<NM>   combinedkey = 0, ktcom;
+    morton<N>    key, kt1, nbrkey;
+    morton<M>    seedkey, seednbrkey = 0, kt, kt3;
+    auto         it3 = seeds.begin();
+    uint         index;
+    bool         bol;
+    real         xyz[6];
+    bitvector<N> boundaryElem;
+    uint         mylevel, changedirectionlevel, direction;
+    uint         topologylevel, nbrseedlevel, nbrlevel, complevel, nbrcomplevel, nbrtopologylevel, combinedlevel, localcombinedlevel;
+    uint         counter;
+    vector<uint> directions;
+    it3 = seeds.begin();
+    vector<bitset<M + N>> message[destination.size()];
+    vector<uint>          dest;
+    vector<uint>          source;
+    uint                  idx;
+    int                   size;
+    int                   flag = 1;
+    morton<M + N>         rcvkey;
+    uint                  seedlevel;
+    morton<N>             elementkey;
+    uint                  idex2;
+    uint                  elementlevel, recvmessagecombinedlevel;
+    //    morton<M + N> *       sendbuff[destination.size()];
+    //    morton<M + N> *       recvbuff[destination.size()];
+    vector<uint>  start;
+    vector<uint>  end;
+    uint          istart, iend;
+    uint          counter3, counter2, counter5;
+    MPI_Request   request[destination.size()], request1[destination.size()], request0;
+    MPI_Status    status;
+    int           sb = 0, rb = 0;
+    morton<N + M> tempkey;
+#if ( 0 )
+    std::string   filename = "rank";
+    filename.append( to_string( Com.myrank ) );
+    ofstream myfile;
+    myfile.open( filename );
+
+    for ( auto it = seeds.begin(); it != seeds.end(); it++ )
+    {
+        ////  cout << RED << "prod id " << Com.myrank << "  seed " << ( *it ) << RESET << endl;
+        myfile << "prod id " << Com.myrank << "  " << con++ << "  seed " << ( *it ) << endl;
+    }
+    myfile << " topology size " << proc.size() << endl;
+#endif
+
+    uint  con = 0;
+    char *sendbuff[destination.size()];
+    char *recvbuff[destination.size()];
+
+    // extract the boundary elements for each tree from the tagged list
+    // get the ectent that we need to refine in the initia step
+    // we know the number of trees therefore, initialize it here
+    // myfile << "Writing this to a file.\n";
+    /*
+     * previuos version
+        for ( auto it = trees.begin(); it != trees.end(); it++ )
+        {
+            start.push_back( 0 );
+            end.push_back( ( *it ).refineListSize() );
+        }
+    */
+    // the main while loop
+
+    //  cout << "size start=" << start.size() << endl;
+    //   cout << "destination ize " << destination.size() << endl;
+    //   cout << "size end=" << end.size() << endl;
+
+    bool loopbool = true;
+    uint bcstart, bcend;
+    bool innerloop = true;
+
+    while ( loopbool )
+    {
+        // start out by setting loopbool=0
+        loopbool = false;
+        counter2 = 0;
+
+        // enforce 4: balance for each tree and extract the boundary elements from the list of elements to be refined
+
+        for ( auto it = trees.begin(); it != trees.end(); it++ )
+        {
+            //            ( *it ).fourToOneP( start.at( counter2 ), end.at( counter2 ) );
+
+            ( *it ).fourToOne();
+            ( *it ).refinelistReset();
+            counter2++;
+        }
+
+        // separates the list between local boundary and non-local boundary
+        it3      = seeds.begin();
+
+#if ( 1 )
+        counter5 = 0;
+
+        for ( auto it = trees.begin(); it != trees.end(); it++ )
+        {
+            seedkey = ( *it3 );
+            proc.level( seedkey, &topologylevel );
+            // cout<<GREEN<<"Top lovel "<<topologylevel<<"seedkey "<<seedkey<<RESET<<endl;
+
+            ( *it ).refinelistReset();
+
+            innerloop = true;
+            while ( innerloop )
+            {
+                innerloop = false;
+
+                // for ( uint i = start.at( counter5 ); i < end.at( counter5 ); i++ )
+                for ( auto i = ( *it ).Rbegin(); i != ( *it ).Rend(); i++ )
+                {
+                    combinedkey = 0;
+
+                    for ( uint j = 0; j < 3 * topologylevel; j++ )
+                    {
+                        combinedkey[NM - j - 1] = seedkey[M - j - 1];
+                    }
+
+                    auto p = ( *it ).readRefineList( i );
+                    // if the tag = 1 then we have already investigated this guy, continue
+                    if ( p.second == 1 )
+                    {
+                        continue;
+                    }
+                    //                    cout<<RED<<p.first<<endl;
+
+                    key = p.first;
+
+                    ( *it ).level( key, &mylevel );
+
+                    combinedlevel = topologylevel + mylevel;
+
+                    for ( uint j = 0; j < 3 * mylevel; j++ )
+                    {
+                        combinedkey[NM - 3 * (topologylevel)-j - 1] = key[N - j - 1];
+                    }
+
+                    ktcom = combinedkey;
+
+                    for ( uint direction = 0; direction < 3; direction++ )
+                    {
+                        if ( !( *it ).isBoundary( key, direction ) )
+                        {
+                            continue;
+                        }
+                        //  cout << " direction " << direction << endl;
+                        //   cout << " combined key " << combinedkey << endl;
+                        findFlipLevel( combinedkey, &combinedlevel, &changedirectionlevel, &direction );
+
+                        if ( changedirectionlevel != 0 )
+                        {
+                            flipForNbr( combinedkey, &combinedlevel, &changedirectionlevel, &direction );
+#if ( 1 )
+                            //     cout << " combined key " << combinedkey << " combined level " << combinedlevel << endl;
+                            getNbrSeedLevel( combinedkey, maxProcLevel, &nbrseedlevel, proc );
+
+                            seednbrkey = 0;
+                            for ( uint k = 0; k < 3 * nbrseedlevel; k++ )
+                            {
+                                seednbrkey[M - 1 - k] = combinedkey[NM - k - 1];
+                                // cout<<RED<<combinedkey[NM-k-1]<<RESET<<endl;
+                            }
+
+                            //   cout << "seednbrkey " << BLUE << seednbrkey << RESET << endl;
+                            // myfile << "  seed key  "<<seednbrkey <<  endl;
+                            nbrkey = 0;
+
+                            for ( uint k = 0; k < N; k++ )
+                            {
+                                nbrkey[N - k - 1] = combinedkey[NM - 3 * (nbrseedlevel)-1 - k];
+                            }
+                            //  cout << " nbrkey " << nbrkey << endl;
+
+                            if ( isInSeed( seednbrkey, &counter ) )
+                            {
+                                auto it2 = std::next( trees.begin(), counter );
+                                auto it4 = ( *it2 ).find( nbrkey );
+
+                                // seedlevel
+                                // ( proc ).level( seednbrkey, &nbrlevel );
+                                // initial guess on nbr level as constructed
+                                // this is a singularity for level zero, it might be negative for first level
+                                // I remove this mannually
+                                if ( combinedlevel >= nbrseedlevel )
+                                {
+                                    nbrlevel = combinedlevel - nbrseedlevel;
+                                }
+                                else
+                                {
+                                    nbrlevel = 1;
+                                }
+                                //      cout<<RED<<nbrlevel<<RESET<<endl;
+
+                                // now find the real levels
+
+                                if ( it4 != ( *it2 ).end() )
+                                {
+                                    ( *it2 ).level( it4->first, &nbrlevel );
+                                    //         cout << YELLOW << nbrlevel << RESET << endl;
+                                }
+                                else
+                                {
+                                    // this condition imples level is lower no need for modification and search, I commented it out
+                                    //                                nbrlevel                     = mylevel-1;
+                                    // ( *it2 ).level( it4->first, &nbrlevel );
+                                    nbrlevel                     = nbrlevel - 1;
+                                    nbrkey[N - 3 * nbrlevel - 1] = 0;
+                                    nbrkey[N - 3 * nbrlevel - 2] = 0;
+                                    nbrkey[N - 3 * nbrlevel - 3] = 0;
+
+                                    //            cout <<RED<< N - 3 * nbrlevel - 1 << " " << mylevel << RESET<<endl;
+                                    //                                      auto it4=(*it2).find(nbrkey);
+                                    //                                      (*it).level(it4->first,&nbrlevel);
+                                }
+
+                                // cout << "nbrkey " << RED << nbrkey << "  count " << counter << RESET << endl;
+                                // cout<<"inside"<<endl;
+                                if ( ( *it2 ).find( nbrkey ) == ( *it2 ).end() )
+                                {
+                                    cout << GREEN << nbrkey << "direction " << direction << "level " << nbrlevel << RESET << endl;
+                                    throw std::runtime_error( "error in finding key" RESET );
+                                }
+
+                                nbrcomplevel = nbrlevel + nbrseedlevel;
+
+                                //                             cout<<RED<<nbrlevel<<" "<<nbrseedlevel<<RESET<<endl;
+                                //                             cout<<YELLOW<<nbrcomplevel<<" " <<combinedlevel<<RESET<<endl;
+                                // if not in the list add to the list, dont forget to modify here
+                                // watch out this element might have already been tagged
+
+                                if ( nbrcomplevel < combinedlevel && ( *it2 ).isInRefineList( nbrkey ) == false )
+                                {
+                                    ( *it2 ).addToList( nbrkey );
+                                    innerloop = true;
+                                    // here is where boolwhile is affected
+                                    loopbool = true;
+                                    //       cout << RED "======================================" << endl;
+                                    //       cout << "added to list" << nbrkey << endl;
+                                    //       cout << "======================================" RESET << endl;
+                                }
+                                // cout<<seednbrkey<<RED<<seednbrkey<<RESET<<endl;
+                            }
+
+                            else
+                            {
+                                // sorts for communication
+
+                                // prepare for communication, pack all the elements with the destination, sender is   my_rank
+
+                                // find seednbrkey from global data
+                                auto it5 = proc.find( seednbrkey );
+                                //                        dest.push_back( it5->second[0] );
+                                auto it6 = destination.begin();
+                                if ( it5 != proc.end() )
+                                {
+                                    it6 = find( destination.begin(), destination.end(), it5->second[0] );
+                                }
+                                else
+                                {
+                                    std::runtime_error( "Not found" );
+                                }
+                                // combined key should be avoided
+                                idx = it6 - destination.begin();
+                                // cout << "---------------------->>> index" << RED << idx << RESET << endl;
+                                // before pushing back, need to be careful about the key with all zeros,
+                                // to accommodate this, the first bit (far right) is flipped and a sibling is sent
+                                removeAllZeroSingularity( combinedkey, combinedlevel );
+                                // cout << GREEN << " proc_id " << Com.myrank << "seednbrkey  " << seednbrkey << "combinedkey  " <<
+                                // combinedkey
+                                //     << "combined level " << combinedlevel << endl;
+                                message[idx].push_back( combinedkey );
+
+                                // myfile<< " combined key "<< combinedkey <<endl;
+                                //                       cout <<"message "<< message[i].at(0) << RESET << endl;
+                            }
+                        }
+                        combinedkey = ktcom;
+                    }
+                    // here change the int value for ith element of the it-th tree
+
+                    ( *it ).flipRefineElemTag( i );
+                }
+            }
+#endif
+
+            counter5++;
+            it3 = std::next( it3, 1 );
+        }
+
+#endif
+
+        // do a neighborhood comm to tell the nbrs the size of the message to be recieved
+
+#if ( 1 )
+        for ( uint i = 0; i < destination.size(); i++ )
+        {
+            //    sendbuff[i] = new morton<M + N>[ message[i].size() ];
+            /*
+                        for ( uint j = 0; j < message[i].size(); j++ )
+                        {
+                            sendbuff[i][j] = message[i].at( j );
+                        }
+            */
+            // sending with boolean is supposed to be more portable
+            sendbuff[i] = new char[message[i].size() * ( M + N )];
+            // counter6=0;
+
+            for ( uint j = 0; j < message[i].size(); j++ )
+            {
+                tempkey = message[i].at( j );
+
+                //     myfile<<" message to be sent "<<tempkey<<endl;
+                for ( uint k = 0; k < M + N; k++ )
+                {
+                    if ( tempkey[k] == true )
+                    {
+                        sendbuff[i][j * ( M + N ) + k] = '1';
+                    }
+                    else
+                    {
+                        sendbuff[i][j * ( M + N ) + k] = '0';
+                    }
+                }
+            }
+
+            //            cout << "================================== " << endl;
+            //            cout << RESET "messagesize " << message[i].size() << " destination " << destination.at( i ) << RESET << endl;
+            //            cout << "================================== " << endl;
+            // send messages to destinations and tag each meaasge with self rank (myrank)
+            //
+            MPI_Isend( sendbuff[i], message[i].size() * ( M + N ), MPI_CHAR, destination.at( i ), Com.myrank, MPI_COMM_WORLD,
+                       &request1[i] );
+        }
+
+        for ( uint i = 0; i < destination.size(); i++ )
+        {
+            //             MPI_Iprobe(destination.at(i), destination.at(i), MPI_COMM_WORLD,&flag, &status);
+            // this is a symmetric comm pattern therefore any
+            //
+            MPI_Probe( destination.at( i ), destination.at( i ), MPI_COMM_WORLD, &status );
+
+            //   MPI_Probe( MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status );
+            // while(flag!=0)
+            {
+                // MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD,&flag, &status);
+                //  cout << BLUE << flag << RESET << endl;
+                // if ( flag == 1 )
+                {
+                    MPI_Get_count( &status, MPI_CHAR, &size );
+
+                    // recvbuff[i] = new morton<M + N>[ size ];
+                    // notice we revcieved the message by byte so need to specify,  to find the number of elements simly divide it by sizeof
+                    // bool
+                    recvbuff[i] = new char[size];
+                    //           cout << "******************* " << size << endl;
+
+                    MPI_Irecv( recvbuff[i], size, MPI_CHAR, destination.at( i ), destination.at( i ), MPI_COMM_WORLD, &request[i] );
+
+                    MPI_Wait( &request[i], &status );
+                    // if ( size != 0 )
+                    {
+                        //                cout << "rank " << Com.myrank << "recvbuff ??????????????? " << recvbuff[0][0] << endl;
+
+                        // if that violates the balance condition add it to the list in the appropriate location
+
+                        for ( uint j = 0; j < size / ( M + N ); j++ )
+                        {
+                            rcvkey = 0;
+
+                            for ( uint k = 0; k < N + M; k++ )
+                            {
+                                if ( recvbuff[i][j * ( N + M ) + k] == '1' )
+                                {
+                                    rcvkey.flip( k );
+                                }
+                            }
+
+                            //                   cout << "p_id " << Com.myrank << " " << rcvkey << endl;
+
+                            //  myfile << " p_id  " << Com.myrank << " " << rcvkey << endl;
+
+                            // restore if modified to handle singularity
+                            // restoration needsto be done before this func
+
+                            combinedLevel( rcvkey, &recvmessagecombinedlevel );
+
+                            recoverAllZeroSingularity( rcvkey, recvmessagecombinedlevel );
+
+                            findSeedLevelForRcvdMessage( rcvkey, &seedlevel, proc );
+
+                            //                           cout << rcvkey << endl;
+                            //                            cout << "seedlevel " << seedlevel << endl;
+
+                            constructSeedKeyForRcvdMessage( rcvkey, seedlevel, seedkey );
+                            //                                                      cout << "seedlevel " << seedlevel << endl;
+
+                            /*      	    uint check;
+                                               proc.level(seedkey,&check);
+                                               cout<<RED<<check<<" "<<seedlevel<<RESET<<endl;
+                                               if(seedlevel!=check)
+                                              {
+                                               throw std::runtime_error("levels calculated for seed inconsistent");
+                                               }
+                              */
+                            constructElementKeyForRcvdMessage( rcvkey, seedlevel, elementkey );
+                            //            cout << "element key " << elementkey << endl;
+
+                            // cout << RED "rcvkey level " << recvmessagecombinedlevel << RESET << endl;
+
+                            auto it7 = std::find( seeds.begin(), seeds.end(), seedkey );
+
+                            if ( it7 == seeds.end() )
+                            {
+                                cout << RED << "myrank " << Com.myrank << " " << seedkey << RESET << endl;
+
+                                throw std::runtime_error( RED "seed not found in Balance Comm" RESET );
+                            }
+
+                            idex2 = std::distance( seeds.begin(), it7 );
+
+                            auto it9 = std::next( trees.begin(), idex2 );
+
+                            if ( recvmessagecombinedlevel >= seedlevel )
+                            {
+                                elementlevel = recvmessagecombinedlevel - seedlevel;
+                            }
+                            else
+                            {
+                                elementlevel = 1;
+                            }
+                            // cout << BLUE << elementlevel << RESET << endl;
+
+                            // myfile <<" recv message combined level " <<  recvmessagecombinedlevel <<" seed level "<< seedlevel << endl;
+                            // myfile <<" element level " << elementlevel<< " elementkey  "<< elementkey  << endl;
+
+                            // recover the singularity
+                            // error here, I flip the code such that we can get the level
+                            // myfile << rcvkey << " " << recvmessagecombinedlevel << endl;
+                            // myfile << elementkey << endl;
+                            // myfile << seedkey << " " << seedlevel << endl;
+                            // myfile << elementlevel << endl;
+                            ( *it9 ).level( elementkey, &elementlevel );
+                            // myfile << elementlevel << endl;
+
+                            //                            recoverAllZeroSingularity( elementkey, elementlevel );
+
+                            // get the real level
+                            if ( ( *it9 ).isInMeshList( elementkey ) == false )
+                            {
+                                //   cout << "inside mesh" << elementkey << endl;
+                                elementkey[N - 3 * ( elementlevel - 1 ) - 1] = 0;
+
+                                elementkey[N - 3 * ( elementlevel - 1 ) - 2] = 0;
+
+                                elementkey[N - 3 * ( elementlevel - 1 ) - 3] = 0;
+                            }
+                            //     myfile<<elementkey<<endl;
+                            ( *it9 ).level( elementkey, &elementlevel );
+
+                            localcombinedlevel = elementlevel + seedlevel;
+
+                            // add if the level is lower
+
+                            if ( localcombinedlevel < recvmessagecombinedlevel && ( *it9 ).isInRefineList( elementkey ) == false )
+                            {
+                                //                cout << BLUE << localcombinedlevel << "            " << recvmessagecombinedlevel << RESET
+                                // << endl;
+
+                                //               cout << "elementkey" << elementkey << endl;
+                                ( *it9 ).addToList( elementkey );
+                                loopbool = true;
+                                /*                cout << "===================" << endl;
+                                                cout << "===================" << endl;
+                                                cout << "===================" << endl;
+                                                cout << "===================" << endl;
+
+                                                cout << "===================" << endl;
+                                                cout << "===================" << endl;
+                                                cout << "===================" << endl;
+                                                cout << "===================" << endl;
+                */
+                            }
+
+                            // see if this element exits, if yes, we are ok, if not add to tree referenced by pointer *it9
+                        }
+                    }
+                }
+            }
+        }
+
+#endif
+
+        if ( loopbool == 1 )
+        {
+            sb = 1;
+        }
+        else
+        {
+            sb = 0;
+        }
+
+        // this value is boolan,use MPI_BYTE, since bool size is implementation dependent, use sizeof(bool)
+        // nor portable switched to short
+
+        //        MPI_Iallreduce( &sb, &rb, sizeof( bool ), MPI_BYTE, MPI_MAX, MPI_COMM_WORLD, &request0 );
+
+        MPI_Iallreduce( &sb, &rb, 1, MPI_SHORT, MPI_MAX, MPI_COMM_WORLD, &request0 );
+        // do some computation here
+        //
+
+        counter3 = 0;
+
+        // for debug for now do the refinement separately
+        /*
+                for ( auto it = trees.begin(); it != trees.end(); it++ )
+                {
+                    start.at( counter3 ) = end.at( counter3 );
+                    end.at( counter3 ) = ( *it ).refineListSize();
+                    counter3++;
+                }
+        */
+
+        MPI_Wait( &request0, MPI_STATUS_IGNORE );
+
+        for ( uint j = 0; j < destination.size(); j++ )
+        {
+            MPI_Wait( &request1[j], &status );
+            delete[] sendbuff[j];
+            message[j].clear();
+            message[j].shrink_to_fit();
+            delete[] recvbuff[j];
+        }
+        //
+        // need to use the recv buffer
+        //
+        if ( rb == 1 )
+        {
+            loopbool = true;
+            for ( auto it = trees.begin(); it != trees.end(); it++ )
+            {
+                ( *it ).refinelistReset();
+            }
+        }
+        if ( loopbool == 1 )
+        {
+            //                       cout << RED << " loopbool " << loopbool << " rb " << rb << " sb " << sb << RESET << endl;
+        }
+    }
+
+    //    myfile.close();
+
+    //   start.clear();
+    //   end.clear();
+    // assigne recieved elements to corresponding lists if needed
+}
+
+
+
 #endif
 
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
@@ -5004,6 +5075,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::refineForestBalanced( uint nlevel,
         {
             ( *it ).pushToRefinelist( i );
         }
+
         fourToOneBalance( proc );
 
         //        MPI_Barrier(MPI_COMM_WORLD);
@@ -5032,7 +5104,7 @@ template <size_t N, typename Nvalue, size_t M, typename Mvalue>
 void Forest<N, Nvalue, M, Mvalue>::debug( Tree<M, Mvalue> &proc )
 {
     morton<M> seedkey = 0;
-    uint counter = 0;
+    uint      counter = 0;
 
     if ( isInSeed( seedkey, &counter ) )
     {
@@ -5040,7 +5112,7 @@ void Forest<N, Nvalue, M, Mvalue>::debug( Tree<M, Mvalue> &proc )
         //    cout << "counter is " << counter << endl;
     }
     morton<N> elem = 0;
-    int myrank;
+    int       myrank;
 
     MPI_Comm_rank( MPI_COMM_WORLD, &myrank );
 
@@ -5105,7 +5177,7 @@ template <size_t N, typename Nvalue, size_t M, typename Mvalue>
 void Forest<N, Nvalue, M, Mvalue>::zoltanGeomrepart( Tree<M, Mvalue> &proc, uint setmethod )
 {
     uint myvalue = seeds.size();
-    uint q = myvalue;
+    uint q       = myvalue;
 
     CommPoint2Point<uint> com( &q, 1 );
 
@@ -5117,13 +5189,13 @@ void Forest<N, Nvalue, M, Mvalue>::zoltanGeomrepart( Tree<M, Mvalue> &proc, uint
     // for better scaling
 
     //       uint totalvalue=proc.size();
-    uint totalvalue;
+    uint                 totalvalue;
     CommCollective<uint> comc( nullptr, 1, Com.comsize - 1 );
     comc.IgetTotalNumber( &offset, &myvalue, &totalvalue );
     real *weight = nullptr;
-    weight = new real[myvalue];
+    weight       = new real[myvalue];
     Center_coords XYZ;
-    auto it1 = seeds.begin();
+    auto          it1 = seeds.begin();
     //    morton<N> key;
     uint co = 0;
     real xyzc[3];
@@ -5136,7 +5208,7 @@ void Forest<N, Nvalue, M, Mvalue>::zoltanGeomrepart( Tree<M, Mvalue> &proc, uint
         XYZ.at( co ).x = xyzc[0];
         XYZ.at( co ).y = xyzc[1];
         XYZ.at( co ).z = xyzc[2];
-        weight[co] = ( *it ).size();
+        weight[co]     = ( *it ).size();
         //            cout<<" weights "<<Com.myrank<<" "<<weight[co]<<endl;
         co++;
         it1 = std::next( it1, 1 );
@@ -5164,7 +5236,7 @@ void Forest<N, Nvalue, M, Mvalue>::zoltanGeomrepart( Tree<M, Mvalue> &proc, uint
 
     // sort which procesors are the destination here
 
-    uint countdest;
+    uint         countdest;
     vector<uint> dest;
     for ( uint i = 0; i < zoltan_out.numExport; i++ )
     {
@@ -5182,7 +5254,7 @@ void Forest<N, Nvalue, M, Mvalue>::zoltanGeomrepart( Tree<M, Mvalue> &proc, uint
 
     // which seeds to send,
     bitvector<M> message[dest.size()];
-    auto it2 = seeds.begin();
+    auto         it2 = seeds.begin();
     for ( uint i = 0; i < dest.size(); i++ )
     {
         for ( uint j = 0; j < zoltan_out.numExport; j++ )
@@ -5208,8 +5280,8 @@ void Forest<N, Nvalue, M, Mvalue>::zoltanGeomrepart( Tree<M, Mvalue> &proc, uint
     //
 
     bool *sendbuff[dest.size()];
-    uint msize[dest.size()];
-    uint idx;
+    uint  msize[dest.size()];
+    uint  idx;
 
     for ( uint i = 0; i < dest.size(); i++ )
     {
@@ -5217,7 +5289,7 @@ void Forest<N, Nvalue, M, Mvalue>::zoltanGeomrepart( Tree<M, Mvalue> &proc, uint
         for ( uint j = 0; j < message[i].size(); j++ )
         {
             auto it7 = std::find( seeds.begin(), seeds.end(), message[i].at( j ) );
-            idx = std::distance( seeds.begin(), it7 );
+            idx      = std::distance( seeds.begin(), it7 );
             auto it3 = std::next( trees.begin(), idx );
             msize[i] += ( *it3 ).size();
         }
@@ -5229,10 +5301,10 @@ void Forest<N, Nvalue, M, Mvalue>::zoltanGeomrepart( Tree<M, Mvalue> &proc, uint
 
 #if ( 1 )
     // assign the trees to the buffer
-    uint totalsize;
+    uint      totalsize;
     morton<N> kt;
     co = 0;
-    morton<M> kt2;
+    morton<M>   kt2;
     MPI_Request request[dest.size()];
 
     MPI_Status status;
@@ -5343,8 +5415,8 @@ void Forest<N, Nvalue, M, Mvalue>::zoltanGeomrepart( Tree<M, Mvalue> &proc, uint
 
     // cout<<YELLOW<<Com.myrank<<" src size "<<src.size()<<"dest size"<<dest.size()<<" "<<zoltan_out.numImport<<RESET<<endl;
     // f<<Com.myrank<<" src size "<<src.size()<<" dest size "<<dest.size()<<" import size  "<<zoltan_out.numImport<<endl;
-    int size;
-    uint recvtotalsize = 0;
+    int         size;
+    uint        recvtotalsize = 0;
     MPI_Request request2[src.size()];
 
     uint co2 = 0;
@@ -5496,7 +5568,7 @@ void Forest<N, Nvalue, M, Mvalue>::debugDerefine( Tree<M, Mvalue> &proc )
         ( *it ).refineRefineList();
     }
 
-    morton<N> key1 = 0;
+    morton<N>                          key1 = 0;
     std::unordered_map<morton<N>, int> refinelist;
     key1.flip( N - 1 );
     key1.flip( N - 2 );
@@ -5543,8 +5615,8 @@ void Forest<N, Nvalue, M, Mvalue>::debugDerefine( Tree<M, Mvalue> &proc )
 // check the true false situation for 2:1 balance with neighbors
 
 template <size_t N, typename Nvalue, size_t M, typename Mvalue>
-bool Forest
-<N, Nvalue, M, Mvalue>::checkWithNbrs( bool *sendbuf, bool *recvbuf ) /*!< creates distributed (acalable) graph for communication */
+bool Forest<N, Nvalue, M, Mvalue>::checkWithNbrs( bool *sendbuf,
+                                                  bool *recvbuf ) /*!< creates distributed (acalable) graph for communication */
 {
     bool bol = false;
 
@@ -5575,10 +5647,9 @@ bool Forest
 // the previous 4:1 message at the expense of one message
 
 template <size_t N, typename Nvalue, size_t M, typename Mvalue>
-void Forest
-<N, Nvalue, M, Mvalue>::rcvrMessageSize( int *sendbuf, int *recvbuf ) /*!< creates distributed (acalable) graph for communication */
+void Forest<N, Nvalue, M, Mvalue>::rcvrMessageSize( int *sendbuf,
+                                                    int *recvbuf ) /*!< creates distributed (acalable) graph for communication */
 {
-
     MPI_Neighbor_alltoall( sendbuf, 1, MPI_INT, recvbuf, 1, MPI_INT, graphComm );
     /*
         for(uint i=0;i<destination.size(); i++)
@@ -5594,11 +5665,10 @@ void Forest
 template <size_t N, typename Nvalue, size_t M, typename Mvalue>
 void Forest<N, Nvalue, M, Mvalue>::checkNbrsOfNbrsConsistency() /*!< creates distributed (acalable) graph for communication */
 {
-
-    int size;
-    MPI_Status status, status1;
+    int         size;
+    MPI_Status  status, status1;
     MPI_Request request[nbrsOfNbrs.size()], request1;
-    uint dest[nbrsOfNbrs.size()];
+    uint        dest[nbrsOfNbrs.size()];
 
     for ( uint i = 0; i < nbrsOfNbrs.size(); i++ )
     {
@@ -5651,10 +5721,9 @@ void Forest<N, Nvalue, M, Mvalue>::checkNbrsOfNbrsConsistency() /*!< creates dis
 }
 
 template <size_t N, typename Nvalue, size_t M, typename Mvalue>
-void Forest
-<N, Nvalue, M, Mvalue>::checkZoltanPartConsistency( Tree<M, Mvalue> &proc ) /*!< creates distributed (acalable) graph for communication */
+void Forest<N, Nvalue, M, Mvalue>::checkZoltanPartConsistency(
+Tree<M, Mvalue> &proc ) /*!< creates distributed (acalable) graph for communication */
 {
-
     uint numtrees = 0;
 
     for ( auto it = proc.begin(); it != proc.end(); it++ )
@@ -5681,7 +5750,6 @@ void Forest
         cout << RED << "tree size after partitioning =  " << total_trees << RESET << endl;
         if ( proc.size() != total_trees )
         {
-
             throw std::runtime_error( "inconsistent partitioning by Zoltan" );
         }
     }
@@ -5698,7 +5766,6 @@ void Forest
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
 void TemplateForest<N, Nvalue, M, Mvalue, T>::nonCollectiveNbrComm()
 {
-
     uint *sendbuf = new uint[destination.size()];
     uint *recvbuf = new uint[destination.size()];
     ;
@@ -5713,7 +5780,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::nonCollectiveNbrComm()
     }
 
     MPI_Request request, request0;
-    MPI_Status status;
+    MPI_Status  status;
 
     if ( Com.myrank == 0 )
     {
@@ -5748,7 +5815,6 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::nonCollectiveNbrComm()
 
     for ( uint i = 0; i < destination.size(); i++ )
     {
-
         cout << RED << Com.myrank << " " << recvbuf[i] << RESET << endl;
     }
 
@@ -5773,7 +5839,6 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::nonCollectiveNbrComm()
 
     for ( uint i = 0; i < destination.size(); i++ )
     {
-
         cout << GREEN << Com.myrank << " " << sendbuf[i] << RESET << endl;
     }
 
@@ -5845,30 +5910,6 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::pushToDerefineEachTree( uint nleve
     for ( auto it = trees.begin(); it != trees.end(); it++ )
     {
         ( *it ).pushToDerefinelist( nlevel );
-
-    }
-
-    retainFourToOneBalance( proc );
-
-    for ( auto it = trees.begin(); it != trees.end(); it++ )
-    {
-        ( *it ).derefineDerefineList();
-    }
-}
-
-// this version reuires use of the parallel piped enclosing the geometry 
-// and the number of inactive geometries
-template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
-void TemplateForest<N, Nvalue, M, Mvalue, T>::pushToDerefineEachTree( uint nlevel, Tree<M, uint> &proc,int nInactive, real *enClosingBoxForInactiveGeoms )
-{
-    for ( auto it = trees.begin(); it != trees.end(); it++ )
-    {
-        ( *it ).pushToDerefinelist( nlevel );
-
-        //( *it ).ignoreInactive(nInactive, enClosingBoxForInactiveGeoms);       
-
-        ( *it ).ignoreInactiveVertices(nInactive, enClosingBoxForInactiveGeoms);       
-
     }
 
     retainFourToOneBalance( proc );
@@ -5882,41 +5923,40 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::pushToDerefineEachTree( uint nleve
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
 void TemplateForest<N, Nvalue, M, Mvalue, T>::retainFourToOneBalance( Tree<M, uint> &proc )
 {
-
-    const uint NM = N + M;
-    morton<NM> combinedkey = 0, ktcom;
-    morton<N> key, kt1, nbrkey;
-    morton<M> seedkey, seednbrkey = 0, kt, kt3;
-    auto it3 = seeds.begin();
-    uint index;
-    bool bol;
-    real xyz[6];
+    const uint   NM          = N + M;
+    morton<NM>   combinedkey = 0, ktcom;
+    morton<N>    key, kt1, nbrkey;
+    morton<M>    seedkey, seednbrkey = 0, kt, kt3;
+    auto         it3 = seeds.begin();
+    uint         index;
+    bool         bol;
+    real         xyz[6];
     bitvector<N> boundaryElem;
-    uint mylevel, changedirectionlevel, direction;
-    uint topologylevel, nbrseedlevel, nbrlevel, complevel, nbrcomplevel, nbrtopologylevel, combinedlevel, localcombinedlevel;
-    uint counter;
+    uint         mylevel, changedirectionlevel, direction;
+    uint         topologylevel, nbrseedlevel, nbrlevel, complevel, nbrcomplevel, nbrtopologylevel, combinedlevel, localcombinedlevel;
+    uint         counter;
     vector<uint> directions;
     it3 = seeds.begin();
     vector<bitset<M + N>> message[destination.size()];
     vector<bitset<M + N>> message3[destination.size()];
     //    vector<bitset<M + N>> message2[destination.size()];
-    vector<uint> message2[destination.size()];
-    vector<uint> dest;
-    vector<uint> source;
-    uint idx;
-    int size;
-    int flag = 1;
+    vector<uint>  message2[destination.size()];
+    vector<uint>  dest;
+    vector<uint>  source;
+    uint          idx;
+    int           size;
+    int           flag = 1;
     morton<M + N> rcvkey;
-    uint seedlevel;
-    morton<N> elementkey;
-    uint idex2;
-    uint elementlevel, recvmessagecombinedlevel;
-    vector<uint> start;
-    vector<uint> end;
-    uint istart, iend;
-    uint counter3, counter2, counter5;
-    MPI_Request request[destination.size()], request1[destination.size()], request0;
-    MPI_Status status;
+    uint          seedlevel;
+    morton<N>     elementkey;
+    uint          idex2;
+    uint          elementlevel, recvmessagecombinedlevel;
+    vector<uint>  start;
+    vector<uint>  end;
+    uint          istart, iend;
+    uint          counter3, counter2, counter5;
+    MPI_Request   request[destination.size()], request1[destination.size()], request0;
+    MPI_Status    status;
     morton<N + M> tempkey;
 
     std::string filename = "rank0";
@@ -5924,7 +5964,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::retainFourToOneBalance( Tree<M, ui
     ofstream myfile;
     myfile.open( filename );
 
-    uint con = 0;
+    uint  con = 0;
     char *sendbuff[destination.size()];
     char *recvbuff[destination.size()];
     uint *sendbuff2[destination.size()];
@@ -5993,7 +6033,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::retainFourToOneBalance( Tree<M, ui
 
             for ( uint j = 0; j < 3 * mylevel; j++ )
             {
-                combinedkey[NM - 3 * ( topologylevel ) - j - 1] = key[N - j - 1];
+                combinedkey[NM - 3 * (topologylevel)-j - 1] = key[N - j - 1];
             }
 
             ktcom = combinedkey;
@@ -6031,7 +6071,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::retainFourToOneBalance( Tree<M, ui
 
                     for ( uint k = 0; k < N; k++ )
                     {
-                        nbrkey[N - k - 1] = combinedkey[NM - 3 * ( nbrseedlevel ) - 1 - k];
+                        nbrkey[N - k - 1] = combinedkey[NM - 3 * (nbrseedlevel)-1 - k];
                     }
 
                     // cout << " nbrkey " << nbrkey << endl;
@@ -6069,7 +6109,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::retainFourToOneBalance( Tree<M, ui
                             // this condition imples level is lower no need for modification and search, I commented it out
                             //                                nbrlevel                     = mylevel-1;
                             // ( *it2 ).level( it4->first, &nbrlevel );
-                            nbrlevel = nbrlevel - 1;
+                            nbrlevel                     = nbrlevel - 1;
                             nbrkey[N - 3 * nbrlevel - 1] = 0;
                             nbrkey[N - 3 * nbrlevel - 2] = 0;
                             nbrkey[N - 3 * nbrlevel - 3] = 0;
@@ -6364,7 +6404,6 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::retainFourToOneBalance( Tree<M, ui
 
         for ( uint j = 0; j < message2[i].size(); j++ )
         {
-
             sendbuff2[i][j] = message2[i].at( j );
         }
 
@@ -6407,12 +6446,12 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::retainFourToOneBalance( Tree<M, ui
             for ( uint k = 0; k < N; k++ )
 
             {
-                elementkey[N - k - 1] = rcvkey[NM - 3 * ( seedlevel ) - 1 - k];
+                elementkey[N - k - 1] = rcvkey[NM - 3 * (seedlevel)-1 - k];
             }
 
             auto it7 = std::find( seeds.begin(), seeds.end(), seedkey );
 
-            idex2 = std::distance( seeds.begin(), it7 );
+            idex2    = std::distance( seeds.begin(), it7 );
             auto it9 = std::next( trees.begin(), idex2 );
 
             if ( it9 == trees.end() )
@@ -6429,7 +6468,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::retainFourToOneBalance( Tree<M, ui
             }
         }
     }
-// remove from the list after recieve
+    // remove from the list after recieve
 
 #endif
 
@@ -6457,11 +6496,9 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::retainFourToOneBalance( Tree<M, ui
 }
 
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
-void TemplateForest
-<N, Nvalue, M, Mvalue, T>::checkZoltanPartConsistency( Tree
-                                                       <M, Mvalue> &proc ) /*!< creates distributed (acalable) graph for communication */
+void TemplateForest<N, Nvalue, M, Mvalue, T>::checkZoltanPartConsistency(
+Tree<M, Mvalue> &proc ) /*!< creates distributed (acalable) graph for communication */
 {
-
     uint numtrees = 0;
 
     for ( auto it = proc.begin(); it != proc.end(); it++ )
@@ -6488,7 +6525,6 @@ void TemplateForest
         cout << RED << "tree size after partitioning =  " << total_trees << RESET << endl;
         if ( proc.size() != total_trees )
         {
-
             throw std::runtime_error( "inconsistent partitioning by Zoltan" );
         }
     }
@@ -6523,9 +6559,9 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::createCommGraph( uint Lnbr ) /*!< 
 
     if ( Lnbr == 0 )
     {
-        size = destination.size();
-        sources = new int[size];
-        indegree = size;
+        size      = destination.size();
+        sources   = new int[size];
+        indegree  = size;
         outdegree = size;
 
         for ( uint i = 0; i < size; i++ )
@@ -6538,10 +6574,9 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::createCommGraph( uint Lnbr ) /*!< 
 
     else if ( Lnbr == 1 )
     {
-
-        size = nbrsOfNbrs.size();
-        sources = new int[size];
-        indegree = size;
+        size      = nbrsOfNbrs.size();
+        sources   = new int[size];
+        indegree  = size;
         outdegree = size;
 
         for ( uint i = 0; i < size; i++ )
@@ -6553,7 +6588,6 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::createCommGraph( uint Lnbr ) /*!< 
     }
     else
     {
-
         throw std::runtime_error( "Only neighbors and neighbors of neighbors are supported\n" );
     }
 
@@ -6602,9 +6636,9 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::createCommGraph( uint Lnbr ) /*!< 
     myfile.close();
     */
 
-    bool sendbuf = {false};
+    bool  sendbuf = {false};
     bool *recvbuf = nullptr;
-    recvbuf = new bool[size];
+    recvbuf       = new bool[size];
     // MPI_Neighbor_allgather(&sendbuf, 1 , MPI_UNSIGNED , recvbuf, 1 , MPI_UNSIGNED , graphComm);
 
     //   checkWithNbrs( &sendbuf, recvbuf );
@@ -6642,8 +6676,8 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::createNbrsOfNbrs() /*!< creates di
     uint extendedDest[extendedSize];
 
     extendedDest[0] = Com.myrank;
-    int size;
-    MPI_Status status, status1;
+    int         size;
+    MPI_Status  status, status1;
     MPI_Request request[destination.size()], request1;
 
     for ( uint i = 0; i < destination.size(); i++ )
@@ -6694,8 +6728,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::createNbrsOfNbrs() /*!< creates di
     //    cout << YELLOW << Com.myrank << " nbrsOfNbrs size = " << nbrsOfNbrs.size() << RESET << endl;
     for ( uint i = 0; i < nbrsOfNbrs.size(); i++ )
     {
-
-        cout << YELLOW << Com.myrank << " nbrsOfNbrs size[" << i << "] = " << nbrsOfNbrs.at( i ) << RESET << endl;
+  //      cout << YELLOW << Com.myrank << " nbrsOfNbrs size[" << i << "] = " << nbrsOfNbrs.at( i ) << RESET << endl;
     }
 
     //    cout << YELLOW << Com.myrank << " nbrsSize = " << destination.size() << RESET << endl;
@@ -6704,11 +6737,10 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::createNbrsOfNbrs() /*!< creates di
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
 void TemplateForest<N, Nvalue, M, Mvalue, T>::checkGraphConsistency() /*!< creates distributed (acalable) graph for communication */
 {
-
-    int size;
-    MPI_Status status, status1;
+    int         size;
+    MPI_Status  status, status1;
     MPI_Request request[destination.size()], request1;
-    uint dest[destination.size()];
+    uint        dest[destination.size()];
 
     for ( uint i = 0; i < destination.size(); i++ )
     {
@@ -6749,7 +6781,6 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::checkGraphConsistency() /*!< creat
 
     for ( uint i = 0; i < destination.size(); i++ )
     {
-
         delete[] recvbuff[i];
     }
 
@@ -6772,18 +6803,18 @@ template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
 void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 {
     // cout << "character solving" << endl;
-    const uint NM = N + M;
-    morton<NM> combinedkey = 0, ktcom;
-    morton<N> key, kt1, nbrkey;
-    morton<M> seedkey, seednbrkey = 0, kt, kt3;
-    auto it3 = seeds.begin();
-    uint index;
-    bool bol;
-    real xyz[6];
+    const uint   NM          = N + M;
+    morton<NM>   combinedkey = 0, ktcom;
+    morton<N>    key, kt1, nbrkey;
+    morton<M>    seedkey, seednbrkey = 0, kt, kt3;
+    auto         it3 = seeds.begin();
+    uint         index;
+    bool         bol;
+    real         xyz[6];
     bitvector<N> boundaryElem;
-    uint mylevel, changedirectionlevel, direction;
-    uint topologylevel, nbrseedlevel, nbrlevel, complevel, nbrcomplevel, nbrtopologylevel, combinedlevel, localcombinedlevel;
-    uint counter;
+    uint         mylevel, changedirectionlevel, direction;
+    uint         topologylevel, nbrseedlevel, nbrlevel, complevel, nbrcomplevel, nbrtopologylevel, combinedlevel, localcombinedlevel;
+    uint         counter;
     vector<uint> directions;
     it3 = seeds.begin();
     //    vector<bitset<M + N>> message[destination.size()];
@@ -6798,26 +6829,26 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 
     //  message[0].push_back(0);
     //
-    vector<uint> dest;
-    vector<uint> source;
-    uint idx;
-    int size;
-    int flag = 1;
+    vector<uint>  dest;
+    vector<uint>  source;
+    uint          idx;
+    int           size;
+    int           flag = 1;
     morton<M + N> rcvkey;
-    uint seedlevel;
-    morton<N> elementkey;
-    uint idex2;
-    uint elementlevel, recvmessagecombinedlevel;
+    uint          seedlevel;
+    morton<N>     elementkey;
+    uint          idex2;
+    uint          elementlevel, recvmessagecombinedlevel;
     //    morton<M + N> *       sendbuff[destination.size()];
     //    morton<M + N> *       recvbuff[destination.size()];
-    vector<uint> start;
-    vector<uint> end;
-    uint istart, iend;
-    uint counter3, counter2, counter5;
-    MPI_Request request[destination.size()], request1[destination.size()], request0;
-    MPI_Status status;
-    short sb = 0, rb = 0;
-    bool mybool;
+    vector<uint>  start;
+    vector<uint>  end;
+    uint          istart, iend;
+    uint          counter3, counter2, counter5;
+    MPI_Request   request[destination.size()], request1[destination.size()], request0;
+    MPI_Status    status;
+    short         sb = 0, rb = 0;
+    bool          mybool;
     morton<N + M> tempkey;
 #if ( DEBUG )
     std::string filename = "rank";
@@ -6840,7 +6871,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 
 #endif
 
-    uint con = 0;
+    uint  con = 0;
     char *sendbuff[destination.size()];
     char *recvbuff[destination.size()];
 
@@ -6874,7 +6905,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
     //    while ( loopbool )
     {
         // start out by setting loopbool=0
-        mybool = false;
+        mybool   = false;
         loopbool = false;
         counter2 = 0;
 
@@ -6890,7 +6921,6 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
         uint counter4 = 0;
         for ( auto it = trees.begin(); it != trees.end(); it++ )
         {
-
             for ( auto i = ( *it ).Rbegin(); i != ( *it ).Rend(); i++ )
             {
                 auto p = ( *it ).readRefineList( i );
@@ -6962,7 +6992,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 
                     for ( uint j = 0; j < 3 * mylevel; j++ )
                     {
-                        combinedkey[NM - 3 * ( topologylevel ) - j - 1] = key[N - j - 1];
+                        combinedkey[NM - 3 * (topologylevel)-j - 1] = key[N - j - 1];
                     }
 
                     ktcom = combinedkey;
@@ -7016,7 +7046,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 
                             for ( uint k = 0; k < N; k++ )
                             {
-                                nbrkey[N - k - 1] = combinedkey[NM - 3 * ( nbrseedlevel ) - 1 - k];
+                                nbrkey[N - k - 1] = combinedkey[NM - 3 * (nbrseedlevel)-1 - k];
                             }
 //  cout << " nbrkey " << nbrkey << endl;
 #if ( DEBUG )
@@ -7056,7 +7086,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
                                     // this condition imples level is lower no need for modification and search, I commented it out
                                     //                                nbrlevel                     = mylevel-1;
                                     // ( *it2 ).level( it4->first, &nbrlevel );
-                                    nbrlevel = nbrlevel - 1;
+                                    nbrlevel                     = nbrlevel - 1;
                                     nbrkey[N - 3 * nbrlevel - 1] = 0;
                                     nbrkey[N - 3 * nbrlevel - 2] = 0;
                                     nbrkey[N - 3 * nbrlevel - 3] = 0;
@@ -7096,7 +7126,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 
                             else
                             {
-// sorts for communication
+                                // sorts for communication
 
 #if ( 1 )
 // prepare for communication, pack all the elements with the destination, sender is   my_rank
@@ -7166,7 +7196,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
 
 #endif
 
-// do a neighborhood comm to tell the nbrs the size of the message to be recieved
+        // do a neighborhood comm to tell the nbrs the size of the message to be recieved
 
 #if ( 0 )
         for ( uint i = 0; i < destination.size(); i++ )
@@ -7376,19 +7406,6 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::fourToOneBalance( T &proc )
                                 //               cout << "elementkey" << elementkey << endl;
                                 ( *it9 ).addToList( elementkey );
                                 loopbool = true;
-                                /*                cout << "===================" << endl;
-                                                cout << "===================" << endl;
-                                                cout << "===================" << endl;
-                                                cout << "===================" << endl;
-
-                                                cout << "===================" << endl;
-                                                cout << "===================" << endl;
-                                                cout << "===================" << endl;
-                                                cout << "===================" << endl;
-                */
-
-                                // ????????????????????/
-                                // modify the tags
                                 mybool = true;
                             }
 
@@ -7549,10 +7566,9 @@ uint TemplateForest<N, Nvalue, M, Mvalue, T>::findIndexInSeed( T &proc, morton<M
 }
 
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
-void TemplateForest
-<N, Nvalue, M, Mvalue, T>::appendToMessage( T &proc, morton<M> &seednbrkey, morton<M + N> &combinedkey, const uint combinedlevel )
+void TemplateForest<N, Nvalue, M, Mvalue, T>::appendToMessage( T &proc, morton<M> &seednbrkey, morton<M + N> &combinedkey,
+                                                               const uint combinedlevel )
 {
-
     // there are two possibilities,
     // a) the neighborseed has level not greater than seedlevel which we only have one destination
 
@@ -7589,13 +7605,11 @@ void TemplateForest
     // no need to check this as this automatically implies that the neighbor has a higher level
 }
 
-
 // some instantiations
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
-void TemplateForest<N,Nvalue,M,Mvalue,T>::MPIStartUp()
+void TemplateForest<N, Nvalue, M, Mvalue, T>::MPIStartUp()
 {
- 
-   if ( MPI_SUCCESS != MPI_Comm_dup( MPI_COMM_WORLD, &Com.mpicom ) )
+    if ( MPI_SUCCESS != MPI_Comm_dup( MPI_COMM_WORLD, &Com.mpicom ) )
     {
         cout << BLUE << " Rank(" << Com.myrank << ") > Exit Code : " << MPI_DUP_FAIL << RESET << endl;
         cout << BLUE << ReblAmrGetErrorEnum( MPI_DUP_FAIL ) << RESET << endl;
@@ -7625,11 +7639,9 @@ void TemplateForest<N,Nvalue,M,Mvalue,T>::MPIStartUp()
             exit( 1 );
         }
     }
-  
-  duplicated=1;
-  
-}
 
+    duplicated = 1;
+}
 
 const char *ReblAmrGetErrorEnum( ReblAmrResult error )
 {
@@ -7638,11 +7650,11 @@ const char *ReblAmrGetErrorEnum( ReblAmrResult error )
         case SUCCESS:
             return "SUCCESS";
         case NUM_INPUT_ARGS:
-            return (
-            "\n \t INPUT_FAILURE: \n \n  3 inputs are needed: 1. geometry file (.stl), 2. topology level (int) , 3. refinement level (int) \n " );
+            return ( "\n \t INPUT_FAILURE: \n \n  3 inputs are needed: 1. geometry file (.stl), 2. topology level (int) , 3. refinement "
+                     "level (int) \n " );
         case PROC_LEVEL:
             return ( "\n PROCSIZE is not big enough to accomodate desired processor topology level\n" );
-         case MPI_INIT_CHECK_FAIL:
+        case MPI_INIT_CHECK_FAIL:
             return ( "\n Error in checking to see if MPI is already initialized \n " );
         case MPI_INIT_FAIL:
             return ( "\n Error in MPI initialization\n " );
@@ -7664,15 +7676,13 @@ const char *ReblAmrGetErrorEnum( ReblAmrResult error )
             return ( "\n   Thomas algorithm Failed \n " );
         case MESH_LEVEL:
             return ( "\n TREESIZE is not big enough to accomodate desired mesh level\n" );
-   
     }
 
     return "<unknown>";
 }
 
-
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
-void TemplateForest<N,Nvalue,M,Mvalue,T>::currentDateTime()
+void TemplateForest<N, Nvalue, M, Mvalue, T>::currentDateTime()
 {
     time_t    now = time( 0 );
     struct tm tstruct;
@@ -7682,12 +7692,11 @@ void TemplateForest<N,Nvalue,M,Mvalue,T>::currentDateTime()
     // return nameAppendix;
 }
 
-
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
-void TemplateForest<N,Nvalue,M,Mvalue,T>::runInfo()
+void TemplateForest<N, Nvalue, M, Mvalue, T>::runInfo()
 {
     currentDateTime();
- //   double meshSize = nChunk * nChunk * nChunk * nxChunk * nyChunk * nzChunk;
+    //   double meshSize = nChunk * nChunk * nChunk * nxChunk * nyChunk * nzChunk;
 
     if ( Com.myrank == 0 )
     {
@@ -7703,262 +7712,5007 @@ void TemplateForest<N,Nvalue,M,Mvalue,T>::runInfo()
         ReblAmrOut << "---------------------------------------------------------\n" << endl;
         ReblAmrOut << "                     Parameters                        \n" << endl;
         ReblAmrOut << "---------------------------------------------------------\n" << endl;
-        ReblAmrOut << "# STL geometry mesh quality metrics report = " << CHECK_MESH  <<endl;
-        ReblAmrOut << "# PROC container size = " << PROCSIZE  <<endl;
-        ReblAmrOut << "# TREE container size = " << TREESIZE  <<endl;
-        ReblAmrOut << "# nxChunk = " << npx  <<endl;
-        ReblAmrOut << "# nyChunk = " << npy  <<endl;
-        ReblAmrOut << "# nzChunk = " << npz  <<endl;
-        ReblAmrOut << "# Processor Tree Topology Level : " <<   endl;
-        ReblAmrOut << "# Mesh Level (Tree Level)  " <<   endl;
- 
-        if(ZOLTAN_ON==1)
+        ReblAmrOut << "# STL geometry mesh quality metrics report = " << CHECK_MESH << endl;
+        ReblAmrOut << "# PROC container size = " << PROCSIZE << endl;
+        ReblAmrOut << "# TREE container size = " << TREESIZE << endl;
+        ReblAmrOut << "# nxChunk = " << npx << endl;
+        ReblAmrOut << "# nyChunk = " << npy << endl;
+        ReblAmrOut << "# nzChunk = " << npz << endl;
+        ReblAmrOut << "# Processor Tree Topology Level : " << endl;
+        ReblAmrOut << "# Mesh Level (Tree Level)  " << endl;
+
+        if ( ZOLTAN_ON == 1 )
         {
-        ReblAmrOut << "# Zoltan = ON" << endl;
-        if(WEIGHT==1) 
-        {
-        ReblAmrOut << "# Perfoming Weighted Partitioning" << endl;
+            ReblAmrOut << "# Zoltan = ON" << endl;
+            if ( WEIGHT == 1 )
+            {
+                ReblAmrOut << "# Perfoming Weighted Partitioning" << endl;
+            }
         }
-        } 
 
         if ( WR == 0 )
         {
             ReblAmrOut << "# I/O = OFF"
-                    << "\n"
-                    << endl;
+                       << "\n"
+                       << endl;
         }
-        else if(WR==1)
+        else if ( WR == 1 )
         {
-            ReblAmrOut << "# I/O =  " << WR<<" (i.e. writing only the points) " << "\n" << endl; 
+            ReblAmrOut << "# I/O =  " << WR << " (i.e. writing only the points) "
+                       << "\n"
+                       << endl;
         }
-       else
-       {
-            ReblAmrOut << "# I/O writing out AMR blocks  " <<WR<<" (i.e. Writing the AMR Blocks)" << "\n" << endl; 
-       } 
-       ReblAmrOut << "---------------------------------------------------------\n" << endl;
-       ReblAmrOut << "\n         # Global mesh size = "<<  FormatWithCommas(meshSize)<<" ~ "<<setprecision(2)<<std::fixed<< meshSize/(1.e6)<<" (M) " << "\n"<< endl;
-       ReblAmrOut << "---------------------------------------------------------\n" << endl;
-       ReblAmrOut.close();
-      }
+        else
+        {
+            ReblAmrOut << "# I/O writing out AMR blocks  " << WR << " (i.e. Writing the AMR Blocks)"
+                       << "\n"
+                       << endl;
+        }
+        ReblAmrOut << "---------------------------------------------------------\n" << endl;
+        ReblAmrOut << "\n         # Global mesh size = " << FormatWithCommas( meshSize ) << " ~ " << setprecision( 2 ) << std::fixed
+                   << meshSize / ( 1.e6 ) << " (M) "
+                   << "\n"
+                   << endl;
+        ReblAmrOut << "---------------------------------------------------------\n" << endl;
+        ReblAmrOut.close();
+        cout << " mesh size " << meshSize << endl;
+    }
 }
 
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
-void TemplateForest<N,Nvalue,M,Mvalue,T>::updateSeeds(T &proc)
+void TemplateForest<N, Nvalue, M, Mvalue, T>::allocatePointersforEachBlock( T &proc )
 {
+    for ( auto it = trees.begin(); it != trees.end(); it++ )
+    {
+        ( *it ).allocatePointers();
+    }
 
- seeds.clear();
-    
-// since seeds are used in here 
-
-for ( auto it = proc.begin(); it != proc.end(); it++ )
- {
-          //cout<<" my_rank "<<Com.myrank <<"  "<<it->first<<" "<<it->second[0]<<endl;
-          cout<<" my_rank "<<Com.myrank <<"  "<<it->first<<endl;
-  //      if ( it->second[0] == Com.myrank )
-        {
-           seeds.push_back( it->first );
-
- //            cout <<BLUE<< it->first << " XC " << XC[0] << " " << XC[1] << " " << XC[2] <<RESET<< endl;
-        }
-  }
-
-    
- cout<<" seedsize  " <<seeds.size()<<" porocsize  "<<proc.size()<<endl;
-
-
-morton<N> key;
-/*
-for(int i=0;i<proc.size();i++)
-{
-key=proc.mesh.at(i);
-
+   // initializeTrigonometricForest( proc );
 }
-*/
-
-}
-
 
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
-void TemplateForest<N,Nvalue,M,Mvalue,T>::updateSeedsAndTrees(T &proc)
+void TemplateForest<N, Nvalue, M, Mvalue, T>::initializeTrigonometricForest( T &proc )
 {
+    real      XYZ[6];
+    morton<N> key;
+    Q *       point;
+    real      grad;
+    double    count = 100;
 
-  bitlist<M> seedsTmp; 
-  bitlist<M> seedsDiff; 
-/*
-// save the old seeds 
-  for(auto it=seeds.begin();it!=seeds.end();it++)
-  {
-    seedsTmp.push_back((*it));
-
-    cout<<" temp  "<<(*it)<<endl;
-  }
-
-    cout<<" temp  "<<seedsTmp.size()<<endl;
-*/
- 
- seeds.clear();
- //trees.clear();     
- real X[6];
- real X0[6];
- real len[3];
- real XC[3];
- uint count=0;
- bool bol=true;
-
- vector<Tree<N,Nvalue>> tmp;
-int cnt=0;
-         cout<<" original tree size  "<<trees.size()<<endl;
-  for(auto it=trees.begin();it!=trees.end();it++)
-  {
-    (*it).getCoords(X0);
-//    cout<<" ???????????? "<<X0[0]<<" "<<X0[1]<<endl;
-    bol=true;
-     
-    for ( auto it1 = proc.begin(); it1 != proc.end(); it1++ )
+    for ( auto it = trees.begin(); it != trees.end(); it++ )
     {
-            //cout<<" my_rank "<<com.myrank <<"  "<<it->first<<" "<<it->second[0]<<endl;
-        if ( it1->second[0] == Com.myrank )
+        for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
         {
-            proc.enclosingBox( it1->first, X );
-    
-          // cout<<" !!!!! "<<X[0]<<" "<<X[1]<<endl;
+            key = ( it2->first );
+            ( *it ).enclosingBox( key, XYZ );
 
-            if((fabs(X[0]-X0[0])<1.e-6) && (fabs(X[1]-X0[1])<1.e-6) && (fabs(X[2]-X0[2])<1.e-6) && (fabs(X[3]-X0[3])<1.e-6) && (fabs(X[4]-X0[4])<1.e-6) &&  (fabs(X[5]-X0[5]))<1.e-6 )
-            {
-//               cout<<" inside"<<endl;
-               bol=false;
-               cnt++;
-               break;              
-            }
-         }
-    } 
-    if(bol==true)
-    {
-     tmp.push_back(*it);
+            point = it2->second;
+
+            //         cout<<Com.myrank<<" boxId "<<XYZ[0]<<" "<<XYZ[1]<<" "<<XYZ[2]<<" "<<XYZ[3]<<" "<<XYZ[4]<<" "<<XYZ[5] <<endl;
+
+           S.initializeTrigonometric( point, XYZ );
+           // S.initializeTrigonometric( point, &count );
+            //     count = count + 1;
+        }
+    }
+    cout << Com.myrank << " size " << trees.size() << endl;
    
-    } 
-
-  }
+ //   fdeb.open("report.txt");
+   
  
-  while(tmp.size()!=0)
-  {
-   trees.erase(std::find(trees.begin(),trees.end(),tmp.at(tmp.size()-1)));
-   tmp.pop_back();
-   }
+	 swapGhostCells( proc );
+	imposeBoundaryConditions(proc);
+   //tagBoundaryElementXdirectionSiblings(proc);
+    
 
-//           cout<<" temp list size "<<tmp.size()<<endl;
-//           cout<<" cnt "<<cnt<<endl;
 
-    for ( auto it = proc.begin(); it != proc.end(); it++ )
+
+
+#if ( 0 )
+    // Here I call a function to give it the direction, faceTag and it should provide all the pointC2F
+    auto it  = trees.begin();
+    auto it2 = ( *it ).begin();
+    point    = it2->second;
+
+    Q *pointC2F[4];
+    Q *pointChunk[4];
+
+    int nRowChunkWGst    = ( npy - 1 ) / 2 + 2;
+    int nColumnChunkWGst = ( npz - 1 ) / 2 + 2;
+
+    for ( int i = 0; i < 4; i++ )
     {
-//            cout<<" my_rank "<<com.myrank <<"  "<<it->first<<" "<<it->second[0]<<endl;
-        if ( it->second[0] == Com.myrank )
+        pointChunk[i] = new Q[nColumnChunkWGst * nRowChunkWGst];
+        pointC2F[i]   = new Q[pyg * pzg];
+    }
+
+    int direction = 0;
+    int faceTag   = 0;
+
+    Intrp.fetchFaceChunks( point, pxg, pyg, pzg, direction, faceTag, pointChunk );
+
+    for ( int i = 0; i < 4; i++ )
+    {
+        Intrp.interpolateFace( pointChunk[1], nColumnChunkWGst, nRowChunkWGst, pointC2F[1] );
+    }
+
+    cout << " point \n" << endl;
+
+    for ( int k = 0; k < pzg; k++ )
+    {
+        for ( int j = 0; j < pyg; j++ )
         {
-            proc.enclosingBox( it->first, X );
+            int index = k * pzg * pyg + j * pxg + 1;
 
-            XC[0] = ( X[0] + X[1] ) * 0.5;
-            XC[1] = ( X[2] + X[3] ) * 0.5;
-            XC[2] = ( X[4] + X[5] ) * 0.5;
+ mposeBoundaryConditions(proc);           cout << point[index].p << "  ";
+        }
+        cout << " \n";
+    }
 
-            len[0] = fabs( X[1] - X[0] );
-            len[1] = fabs( X[3] - X[2] );
-            len[2] = fabs( X[5] - X[4] );
+    cout << " pointChunk[2] \n" << endl;
 
-            // regrdless of the topology, we need a tree in tree list
+    for ( int k = 0; k < nRowChunkWGst; k++ )
+    {
+        for ( int j = 0; j < nColumnChunkWGst; j++ )
+        {
+            cout << pointChunk[1][k * nColumnChunkWGst + j].p << "  ";
+        }
+        cout << " \n";
+    }
 
-            seeds.push_back( it->first );
+    cout << " pointC2F[2] \n" << endl;
 
-//            cout <<BLUE<< it->first << " XC " << XC[0] << " " << XC[1] << " " << XC[2] <<RESET<< endl;
+    for ( int k = 0; k < pzg; k++ )
+    {
+        for ( int j = 0; j < pyg; j++ )
+        {
+            cout << pointC2F[1][k * pyg + j].p << "  ";
+        }
+        cout << " \n";
+    }
+
+#endif
+
+#if ( 0 )
+    // Here I call a function to give it the direction, faceTag and it should provide all the pointC2F
+    cout << " IntializeTrigonometric function is called " << endl;
+    auto it  = trees.begin();
+    auto it2 = ( *it ).begin();
+    point    = it2->second;
+
+
+
+for (int k = 0; k < pzg ; k++)
+{
+    for ( int j = 0; j < pyg; j++ )
+    {
+        for ( int i = 0; i < pxg; i++ )
+        {
+            int index = k * pzg * pyg + j * pxg + i;
+
+            cout << point[index].p << "  ";
+        }
+        cout << " \n";
+    }
+	cout<<" k = "<<k<<endl;
+}
+
+cout<<" ***********************************************"<<endl;
+
+/* for face k = 0 */
+  int k0 = pzg-1;                                                                                                                                                                                 
+  int k1 = k0-1;
+  int k2 = k0-2;
+  int i0 = 0;
+  int i1 = 1;
+  int i2 = 2;
+
+cout<<" \n ---------  Ghost Layers------------------\n "<<endl;
+setprecision(10);
+
+for (int k = 0; k < pzg ; k++)
+{
+	for (int j = 0; j < pyg; j++){
+
+
+                     // we need k = 0, k = 1, k = 2; 
+                         
+                    int indexGhost  = pxg*pyg*k + pxg*j + i0;    
+                    int index1      = pxg*pyg*k + pxg*j + i1; 
+                    int index2      = pxg*pyg*k + pxg*j + i2; 
+
+                   cout<<fixed<< point[indexGhost].p<<"  ";	   
+                //point[indexGhost].p = point[indexGhost].p*L0 + point[index1].p*L1 + point[index1].p*L2;
+        }    
+	cout<<endl;
+}
+setprecision(10);
+
+
+cout<<" \n ---------  Ghost Layers  -1 ------------------ \n"<<endl;
+
+
+for (int k = 0; k < pzg ; k++)
+{
+    for (int j = 0; j < pyg; j++){
+
+
+
+                     // we need k = 0, k = 1, k = 2; 
+                         
+                    int indexGhost  = pxg*pyg*k + pxg*j + i0;    
+                    int index1      = pxg*pyg*k + pxg*j + i1; 
+                    int index2      = pxg*pyg*k + pxg*j + i2; 
+
+                   cout<<fixed<< point[index1].p<<"  ";	   
+                //point[indexGhost].p = point[indexGhost].p*L0 + point[index1].p*L1 + point[index1].p*L2;
+            }    
+			cout<<endl;
+     }    
+
+
+cout<<" \n ---------  Ghost Layers -2 ------------------ \n"<<endl;
+setprecision(10);
+
+
+for (int k = 0; k < pzg ; k++)
+{
+    for (int j = 0; j < pyg; j++){
+
+
+
+                     // we need k = 0, k = 1, k = 2; 
+                         
+                    int indexGhost  = pxg*pyg*k + pxg*j + i0;    
+                    int index1      = pxg*pyg*k + pxg*j + i1; 
+                    int index2      = pxg*pyg*k + pxg*j + i2; 
+
+                   cout<<fixed<< point[index2].p<<"  ";	   
+                //point[indexGhost].p = point[indexGhost].p*L0 + point[index1].p*L1 + point[index1].p*L2;
+            }    
+			cout<<endl;
+     }    
+
+
+
+
+
+
+Intrp.interpolateGhostCells(point,pxg,pyg,pzg);
+cout<<"interpolateGhostCells is called from templateForest.cpp to test it \n"<<endl;
+
+setprecision(10);
+cout<<" \n --------- modified  Ghost Layers------------------\n "<<endl;
+
+
+SPLACE  220
+
+{
+    for (int j = 0; j < pyg; j++){
+
+
+
+                     // we need k = 0, k = 1, k = 2; 
+                         
+                    int indexGhost  = pxg*pyg*k + pxg*j + i0;    
+                    int index1      = pxg*pyg*k + pxg*j + i1; 
+                    int index2      = pxg*pyg*k + pxg*j + i2; 
+
+                   cout<<fixed<< point[indexGhost].p<<"  ";	   
+                //point[indexGhost].p = point[indexGhost].p*L0 + point[index1].p*L1 + point[index1].p*L2;
+            }    
+			cout<<endl;
+     }    
+
+
+				
+#endif
+
+
+
+#if ( 0 )
+
+    Q *point0;
+
+    for ( auto it = trees.begin(); it != trees.end(); it++ )
+    {
+        for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+        {
+            //         auto it2=(*it).begin();
+            key = ( it2->first );
+
+            //       key.flip(31);
+ DISPLACE  220
+
+            cout << "key = " << key << " points to " << it2->second << endl;
+
+            point0 = it2->second;
+
+            for ( int k = 0; k < npz + 1; k++ )
+            {
+                for ( int j = 0; j < npy + 1; j++ )
+                {
+                    for ( int i = 0; i < npx + 1; i++ )
+                    {
+                        cout << point0[k * ( npx + 1 ) * ( npy + 1 ) + j * ( npx + 1 ) + i].p << '\t';
+                    }
+                    cout << endl;
+                }
+            }
+
+            cout << " ===================== " << endl;
+        }
+    }
+#endif
+
+}
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::solvePoisson( T &proc, const real &Epsilon, const char*bc, const real* Dirichlet, const real* Neumann )
+{
+ //   ofstream myfile;
+    //myfile.open( "residual.txt" );
+
+    real      XYZ[6];
+    morton<N> key;
+    Q *       point;
+    real      grad;
+    int       itCount = 1;
+
+    real error   = 1.0;
+    real Max, oldMax;
+    int  nloop = 201;
+
+
+    S.setBC(bc,Dirichlet,Neumann);
+    initializeTrigonometricForest(proc);
+
+ 
+#if(POISSON || EXACTBC_X || EXACTBC_Y || EXACTBC_Z)
+
+		cout<<RED<<" Poisson equation is being solved"<<endl;
+
+#if(EXACTBC_X)
+		
+		cout<<" X BC is set to Exact !!! "<<endl;
+#endif
+
+#if(EXACTBC_Y)
+	
+		cout<<" Y BC is set to Exact !!! "<<endl;
+#endif
+
+
+#if(EXACTBC_Z)
+	
+		cout<<" Z BC is set to Exact !!! "<<endl;
+#endif
+		
+		cout<<RESET<<endl;
+#endif
+
+#if(POISSON)
+
+		cout<<"Criteria = "<<scientific<<Epsilon<<endl;
+	    cout<<"#Count"<<" Residual "<<endl;
+        cout<<"------------------------"<<endl;
+
+
+  // while ( itCount < nloop )
+   while(error >  Epsilon)
+    {
+        error = 0.0;
+        for ( auto it = trees.begin(); it != trees.end(); it++ )
+        {
+            for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+            {
+                key = ( it2->first );
+                ( *it ).enclosingBox( key, XYZ );
+                point = it2->second;
+                Max   = S.updateInterior( point, XYZ );
+                error = fmax( Max, error );
+            }
+        }
+
+        if ( itCount % 50 == 0 )
+        {
+  //          myfile << "count : " << itCount << "  error : " << error << fixed << setprecision( 10 ) << endl;
+			 cout<<setw(4)<<itCount<<"  "<<error<<endl;
+		 }
+			
+		        
+		// swap
+        swapGhostCells( proc );
+
+ 		imposeBoundaryConditions(proc);
+
+#if(EXACTBC_X || EXACTBC_Y || EXACTBC_Z)
+
+/* update Ghost cells with exact values */
+        for ( auto it = trees.begin(); it != trees.end(); it++ )
+        {
+            for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+            {
+                key = ( it2->first );
+                ( *it ).enclosingBox( key, XYZ );
+                point = it2->second;
+            	S.exactValueForGhost(point,XYZ);
+			}
+        }
+
+#endif
+
+        itCount++;
+    }
+
+#endif
+
+//    myfile.close();
+}
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::initializeTrigonometricForMMS( T &proc )
+{
+    real      XYZ[6];
+    morton<N> key;
+    Q *       point;
+
+    for ( auto it = trees.begin(); it != trees.end(); it++ )
+    {
+        for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+        {
+            key = ( it2->first );
+            ( *it ).enclosingBox( key, XYZ );
+
+            point = it2->second;
+
+           S.initializeTrigonometricForMMS( point, XYZ );
+        }
+    }
+ 
+    swapGhostCells( proc );
+    imposeBoundaryConditions(proc);
+    
+
+
+}
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::orderAnalysis( T &proc, const real &Epsilon, const char*bc, const real* Dirichlet, const real* Neumann )
+{
+
+    real      XYZ[6];
+    morton<N> key;
+    Q *       point;
+    real      grad;
+    int       itCount = 1;
+
+    real Residual   = 1.0;
+    real Max,localError, error;
+
+	// set the boundary conditions
+    S.setBC(bc,Dirichlet,Neumann);
+	// initialize the blocks with a manufactured source term
+	initializeTrigonometricForMMS(proc);
+	cout<<"Epsilon "<<scientific<<Epsilon<<endl;
+	cout<<"  Count "<<" Residual "<<endl;
+
+	// iterative solution loop
+   while(Residual >  Epsilon)
+    {
+        Residual = 0.0;
+        for ( auto it = trees.begin(); it != trees.end(); it++ )
+        {
+            for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+            {
+                key = ( it2->first );
+                ( *it ).enclosingBox( key, XYZ );
+                point = it2->second;
+                //Max   = S.updateInterior( point, XYZ );
+                Max  = S.redBlackGS(point,XYZ);
+				Residual = fmax( Max, Residual );
+            }
+        }
+
+        if ( itCount % 20 == 0 )
+        {
+             cout<<setw(4)<<itCount<<"  "<<Residual<<endl;
+        }
+
+		// swap boundary values
+        swapGhostCells( proc );
+
+		//transverse interpolations
+		//quadraticInterpTransverseDirection( proc);
+
+		// impose boundary conditions
+        imposeBoundaryConditions(proc);
+	
+		//print count	
+		itCount++;
+	}
+
+	  // calculating the error 
+	  calcError(proc);
+}
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::calcError(T &proc)
+{
+ 
+    real      XYZ[6];
+    morton<N> key;
+    Q *       point;
+    real localError, error;
+
+
+
+ 	 for ( auto it = trees.begin(); it != trees.end(); it++ )
+        {
+            for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+            {
+				 key = ( it2->first );
+                ( *it ).enclosingBox( key, XYZ );
+                point = it2->second;
+                localError = S.getError(point,XYZ);
+                error = fmax(error, localError );
+            }
+        }
+
+	cout<<"\n *************\n"<<endl;
+	cout<<"Error "<<error<<endl;	
+			
+
+
+}
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::addToRefineLisGradBased()
+{
+    real      XYZ[6];
+    morton<N> key;
+    Q *       point;
+    real      grad;
+    double *  grades = nullptr;
+
+    for ( auto it = trees.begin(); it != trees.end(); it++ )
+    {
+        for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+        {
+            key = ( it2->first );
+            ( *it ).enclosingBox( key, XYZ );
+            point = it2->second;
+            grad  = S.getGradient( point, XYZ );
+
+            if ( grad > 0.4 )
+            {
+                ( *it ).pushToRefinelist( key );
+            }
+        }
+    }
+}
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::swapGhostCells( T &proc )
+{
+    // tagBoundaryElementXdirectionSiblings( proc );
+
+    if ( SWAP_X_DIR )
+    {
+    if(SWAP_X_DIR_SIBLING)
+     {
+        swapGhostCellsXdirectionSiblings( proc );
+      }
+     if(SWAP_X_DIR_COUSIN)
+     {
+        swapGhostCellsXdirectionCousins( proc );
+      }
+    }
+
+    if ( SWAP_Y_DIR )
+    {
+    if(SWAP_Y_DIR_SIBLING)
+    {    swapGhostCellsYdirectionSiblings( proc );}
+ 
+    if(SWAP_Y_DIR_COUSIN){
+        swapGhostCellsYdirectionCousins( proc );
+     }
+    }
+    if ( SWAP_Z_DIR )
+    {
+    if(SWAP_Z_DIR_SIBLING)
+    {
+        swapGhostCellsZdirectionSiblings( proc );
+     }
+    
+    if(SWAP_Z_DIR_COUSIN)
+    {
+        swapGhostCellsZdirectionCousins( proc );
+     }
+    }
+}
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::quadraticInterpTransverseDirection( T &proc )
+{
+
+    if ( QUAD_TRANS_X_DIR )
+    {
+    if(QUAD_TRANS_X_DIR_SIBLING)
+     {
+        quadInterpTransDirXdirectionSiblings( proc );
+      }
+     if(QUAD_TRANS_X_DIR_COUSIN)
+     {
+        quadInterpTransDirXdirectionCousins( proc );
+      }
+    }
+     if ( QUAD_TRANS_Y_DIR )
+    {
+    if(QUAD_TRANS_Y_DIR_SIBLING)
+     {
+        quadInterpTransDirYdirectionSiblings( proc );
+      }
+     if(QUAD_TRANS_Y_DIR_COUSIN)
+     {
+        quadInterpTransDirXdirectionCousins( proc );
+      }
+    }
+
+   if ( QUAD_TRANS_Z_DIR )
+    {
+    if(QUAD_TRANS_Z_DIR_SIBLING)
+     {
+        quadInterpTransDirZdirectionSiblings( proc );
+      }
+     if(QUAD_TRANS_X_DIR_COUSIN)
+     {
+        quadInterpTransDirZdirectionCousins( proc );
+      }
+    }
+}
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::quadInterpTransDirXdirectionCousins( T &proc )
+{
+    real          XYZ[6];
+    morton<N>     key, sibkey;
+    Q *           point0;
+    Q *           point1;
+    bitvector<M>  nbr;
+    uint          level, siblevel;
+    int           maxSize;
+    int           count = 0;
+    morton<N + M> globalKey;
+    morton<M>     seedkey;
+    morton<M>     seednbrkey;
+    morton<N>     nbrkey;
+    uint          direction = 0;
+    uint          seedLevel, nbrseedlevel;
+    uint          topologylevel;
+    uint          mylevel, combinedlevel;
+    uint          changedirectionlevel;
+    uint          counter, nbrlevel;
+    uint          counthlevel = 0;
+    int          offset = direction + 1;
+
+    uint              realLevel;
+    uint              combinedLevel;
+    int               estimatedNbrLevel;
+    int               loc, in0, in1;
+    int               flag;
+    vector<morton<N>> nbrs;
+    vector<morton<M>> nbrs0;
+    vector<Q *>       ptrs;
+    count = 0;
+    int index[4];
+    //  **********************************************************************
+    //  first loop looks for the seed that does not have any refinement in it
+    //  *********************************************************************
+    //
+    auto it3 = seeds.begin();
+#if ( 1 )
+    // loop over all the tree lists,
+
+    for ( auto it = trees.begin(); it != trees.end(); it++ )
+    {
+        //        auto it=trees.begin();
+        count = 0;
+        // retrieve the seed key
+        seedkey = ( *it3 );
+        proc.level( seedkey, &topologylevel );
+
+      //  cout << RED << " seed key " << seedkey << " seedlevel " << topologylevel << RESET << endl;
+
+        // this is for the condition that there are no trees grown in the seed
+        // loop over tree elements that has grown in each seed
+
+        for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+        {
+            //            auto it2=(*it).begin();
+
+            key = ( it2->first );
+
+            // if this element is a boundary it will not have nonlocal neighbors
+            // for siblings this is not required
+
+            point0 = it2->second;
+            ( *it ).level( key, &mylevel );
+
+            combinedlevel = mylevel + topologylevel;
+
+           if ( extractSameGlobalLevelCousinInfo( proc, seedkey, key, topologylevel, mylevel, direction, changedirectionlevel, globalKey,
+                                                   seednbrkey, nbrkey, nbrseedlevel )
+                 == -1 )
+            {
+                continue;
+            }
+
+            estimatedNbrLevel = ( (int)mylevel + (int)topologylevel - (int)nbrseedlevel );
+            //cout << " estimated level  " << estimatedNbrLevel << endl;
+
+            flag = extractRealNbrInfo( seednbrkey, nbrkey, estimatedNbrLevel, realLevel );
+
+            // continue if you do not own the seed, or else stack this in a list to be communicated,
+            // this is where parallel communication should occur
+
+            if ( flag == -1 )
+            {
+                continue;
+            }
+
+
+           if(flag==3)
+          {
+           // note for shams, using what you did in siblings just copy paste that over here  
+           // same operation
+
+ 
+		//Modified by : Shams          
+		//My neighbor is at a higher level  
+        bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
+		int faceTag = loc;
+		Intrp.updateRcvdGhstValWithnCoarseBlock(point0, pxg, pyg, pzg, direction,faceTag);
+ 
+          }
+          else
+          {
+            constructTrueNbrKeysCousins( seednbrkey, nbrseedlevel, nbrkey, realLevel, direction, nbrs, flag );
+
+            if ( nbrs.size() == 1 && ( combinedlevel == ( nbrseedlevel + realLevel ) ) )
+            {
+              //  cout << CYAN << nbrs.at( 0 ) << RESET << endl;
+
+                //                cout << " inside " << ptrs.size() << endl;
+
+                continue;
+
+// no operation needed for same level
+//                 swapSameLevelCousins( direction, point0, point1, globalKey, seednbrkey, nbrs, combinedlevel, count, sendReq, rcvReq );
+            }
+#if ( 1 )
+            else if ( nbrs.size() == 1 && ( combinedlevel > ( nbrseedlevel + realLevel ) ) )
+            {
+                             
+//Note to shams, put your fix for denser mesh update here (update method for dense) 
+//use point0
+//swapWithLowerLevelCousin( direction, point0, ptrs, globalKey, seednbrkey, nbrs, combinedlevel, count, sendReq, rcvReq ); 
+ 
+		//Modified by : Shams          
+		//My neighbor is at a lower level  
+        bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
+		int faceTag = loc;
+		Intrp.updateRcvdGhstValWithnFineBlock(point0, pxg, pyg, pzg, direction,faceTag);
+ 
+            }
+            else
+            {
+               
+// Note to shams put your Coarse update here.
+// the current element is coarse (update method for coarse) 
+// so need to update the coarse, use point0  
+// swapWithHigherLevelCousin( direction, point0, ptrs, globalKey, seednbrkey, index, combinedlevel, count, sendReq, rcvReq );
+  
+		//Modified by : Shams          
+		//My neighbor is at a higher level  
+        bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
+		int faceTag = loc;
+		Intrp.updateRcvdGhstValWithnCoarseBlock(point0, pxg, pyg, pzg, direction,faceTag);
+ 
+           }
+          }
+
+
+#endif
+        }
+
+        it3 = std::next( it3, 1 );
+    }
+#endif
+
+}
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::quadInterpTransDirYdirectionCousins( T &proc )
+{
+    real          XYZ[6];
+    morton<N>     key, sibkey;
+    Q *           point0;
+    Q *           point1;
+    bitvector<M>  nbr;
+    uint          level, siblevel;
+    int           maxSize;
+    int           count = 0;
+    morton<N + M> globalKey;
+    morton<M>     seedkey;
+    morton<M>     seednbrkey;
+    morton<N>     nbrkey;
+    uint          direction = 1;
+    uint          seedLevel, nbrseedlevel;
+    uint          topologylevel;
+    uint          mylevel, combinedlevel;
+    uint          changedirectionlevel;
+    uint          counter, nbrlevel;
+    uint          counthlevel = 0;
+    int          offset = direction + 1;
+
+    uint              realLevel;
+    uint              combinedLevel;
+    int               estimatedNbrLevel;
+    int               loc, in0, in1;
+    int               flag;
+    vector<morton<N>> nbrs;
+    vector<morton<M>> nbrs0;
+    vector<Q *>       ptrs;
+    count = 0;
+    int index[4];
+    //  **********************************************************************
+    //  first loop looks for the seed that does not have any refinement in it
+    //  *********************************************************************
+    //
+    auto it3 = seeds.begin();
+#if ( 1 )
+    // loop over all the tree lists,
+
+    for ( auto it = trees.begin(); it != trees.end(); it++ )
+    {
+        //        auto it=trees.begin();
+        count = 0;
+        // retrieve the seed key
+        seedkey = ( *it3 );
+        proc.level( seedkey, &topologylevel );
+
+      //  cout << RED << " seed key " << seedkey << " seedlevel " << topologylevel << RESET << endl;
+
+        // this is for the condition that there are no trees grown in the seed
+        // loop over tree elements that has grown in each seed
+
+        for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+        {
+            //            auto it2=(*it).begin();
+
+            key = ( it2->first );
+
+            // if this element is a boundary it will not have nonlocal neighbors
+            // for siblings this is not required
+
+            point0 = it2->second;
+            ( *it ).level( key, &mylevel );
+
+            combinedlevel = mylevel + topologylevel;
+
+           if ( extractSameGlobalLevelCousinInfo( proc, seedkey, key, topologylevel, mylevel, direction, changedirectionlevel, globalKey,
+                                                   seednbrkey, nbrkey, nbrseedlevel )
+                 == -1 )
+            {
+                continue;
+            }
+
+            estimatedNbrLevel = ( (int)mylevel + (int)topologylevel - (int)nbrseedlevel );
+            //cout << " estimated level  " << estimatedNbrLevel << endl;
+
+            flag = extractRealNbrInfo( seednbrkey, nbrkey, estimatedNbrLevel, realLevel );
+
+            // continue if you do not own the seed, or else stack this in a list to be communicated,
+            // this is where parallel communication should occur
+
+            if ( flag == -1 )
+            {
+                continue;
+            }
+
+
+           if(flag==3)
+          {
+           // note for shams, using what you did in siblings just copy paste that over here  
+           // same operation
+   
+		//Modified by : Shams          
+		//My neighbor is at a higher level  
+        bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
+		int faceTag = loc;
+		Intrp.updateRcvdGhstValWithnCoarseBlock(point0, pxg, pyg, pzg, direction,faceTag);
+ 
+        }
+          else
+          {
+            constructTrueNbrKeysCousins( seednbrkey, nbrseedlevel, nbrkey, realLevel, direction, nbrs, flag );
+
+            if ( nbrs.size() == 1 && ( combinedlevel == ( nbrseedlevel + realLevel ) ) )
+            {
+              //  cout << CYAN << nbrs.at( 0 ) << RESET << endl;
+
+                //                cout << " inside " << ptrs.size() << endl;
+
+                continue;
+
+// no operation needed for same level
+//                 swapSameLevelCousins( direction, point0, point1, globalKey, seednbrkey, nbrs, combinedlevel, count, sendReq, rcvReq );
+            }
+#if ( 1 )
+            else if ( nbrs.size() == 1 && ( combinedlevel > ( nbrseedlevel + realLevel ) ) )
+            {
+                             
+//Note to shams, put your fix for denser mesh here (update method for dense) 
+//swapWithLowerLevelCousin( direction, point0, ptrs, globalKey, seednbrkey, nbrs, combinedlevel, count, sendReq, rcvReq ); 
+
+		//Modified by : Shams          
+		//My neighbor is at a lower level  
+        bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
+		int faceTag = loc;
+		Intrp.updateRcvdGhstValWithnFineBlock(point0, pxg, pyg, pzg, direction,faceTag);
+ 
+            }
+            else
+            {
+               
+// Note to shams put your Coarse update here. the current element is coarse (update method for coarse) 
+// so need to update the coarse, use point0  
+//                swapWithHigherLevelCousin( direction, point0, ptrs, globalKey, seednbrkey, index, combinedlevel, count, sendReq, rcvReq );
+             
+		//Modified by : Shams          
+		//My neighbor is at a higher level  
+        bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
+		int faceTag = loc;
+		Intrp.updateRcvdGhstValWithnCoarseBlock(point0, pxg, pyg, pzg, direction,faceTag);
+ 
+			}
+          }
+
+
+#endif
+        }
+
+        it3 = std::next( it3, 1 );
+    }
+#endif
+
+}
+
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::quadInterpTransDirZdirectionCousins( T &proc )
+{
+    real          XYZ[6];
+    morton<N>     key, sibkey;
+    Q *           point0;
+    Q *           point1;
+    bitvector<M>  nbr;
+    uint          level, siblevel;
+    int           maxSize;
+    int           count = 0;
+    morton<N + M> globalKey;
+    morton<M>     seedkey;
+    morton<M>     seednbrkey;
+    morton<N>     nbrkey;
+    uint          direction = 2;
+    uint          seedLevel, nbrseedlevel;
+    uint          topologylevel;
+    uint          mylevel, combinedlevel;
+    uint          changedirectionlevel;
+    uint          counter, nbrlevel;
+    uint          counthlevel = 0;
+    int          offset = direction + 1;
+
+    uint              realLevel;
+    uint              combinedLevel;
+    int               estimatedNbrLevel;
+    int               loc, in0, in1;
+    int               flag;
+    vector<morton<N>> nbrs;
+    vector<morton<M>> nbrs0;
+    vector<Q *>       ptrs;
+    count = 0;
+    int index[4];
+    //  **********************************************************************
+    //  first loop looks for the seed that does not have any refinement in it
+    //  *********************************************************************
+    //
+    auto it3 = seeds.begin();
+#if ( 1 )
+    // loop over all the tree lists,
+
+    for ( auto it = trees.begin(); it != trees.end(); it++ )
+    {
+        //        auto it=trees.begin();
+        count = 0;
+        // retrieve the seed key
+        seedkey = ( *it3 );
+        proc.level( seedkey, &topologylevel );
+
+      //  cout << RED << " seed key " << seedkey << " seedlevel " << topologylevel << RESET << endl;
+
+        // this is for the condition that there are no trees grown in the seed
+        // loop over tree elements that has grown in each seed
+
+        for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+        {
+            //            auto it2=(*it).begin();
+
+            key = ( it2->first );
+
+            // if this element is a boundary it will not have nonlocal neighbors
+            // for siblings this is not required
+
+            point0 = it2->second;
+            ( *it ).level( key, &mylevel );
+
+            combinedlevel = mylevel + topologylevel;
+
+           if ( extractSameGlobalLevelCousinInfo( proc, seedkey, key, topologylevel, mylevel, direction, changedirectionlevel, globalKey,
+                                                   seednbrkey, nbrkey, nbrseedlevel )
+                 == -1 )
+            {
+                continue;
+            }
+
+            estimatedNbrLevel = ( (int)mylevel + (int)topologylevel - (int)nbrseedlevel );
+            //cout << " estimated level  " << estimatedNbrLevel << endl;
+
+            flag = extractRealNbrInfo( seednbrkey, nbrkey, estimatedNbrLevel, realLevel );
+
+            // continue if you do not own the seed, or else stack this in a list to be communicated,
+            // this is where parallel communication should occur
+
+            if ( flag == -1 )
+            {
+                continue;
+            }
+
+
+           if(flag==3)
+          {
+           // note for shams, using what you did in siblings just copy paste that over here  
+           // same operation
+           
+		//Modified by : Shams          
+		//My neighbor is at a higher level  
+        bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
+		int faceTag = loc;
+		Intrp.updateRcvdGhstValWithnCoarseBlock(point0, pxg, pyg, pzg, direction,faceTag);
+ 
+
+			}
+          else
+          {
+            constructTrueNbrKeysCousins( seednbrkey, nbrseedlevel, nbrkey, realLevel, direction, nbrs, flag );
+
+            if ( nbrs.size() == 1 && ( combinedlevel == ( nbrseedlevel + realLevel ) ) )
+            {
+              //  cout << CYAN << nbrs.at( 0 ) << RESET << endl;
+
+                //                cout << " inside " << ptrs.size() << endl;
+
+                continue;
+
+// no operation needed for same level
+//                 swapSameLevelCousins( direction, point0, point1, globalKey, seednbrkey, nbrs, combinedlevel, count, sendReq, rcvReq );
+            }
+#if ( 1 )
+            else if ( nbrs.size() == 1 && ( combinedlevel > ( nbrseedlevel + realLevel ) ) )
+            {
+                             
+//Note to shams, put your fix for denser mesh here (update method for dense) 
+//swapWithLowerLevelCousin( direction, point0, ptrs, globalKey, seednbrkey, nbrs, combinedlevel, count, sendReq, rcvReq ); 
+		//Modified by : Shams          
+		//My neighbor is at a lower level  
+        bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
+		int faceTag = loc;
+		Intrp.updateRcvdGhstValWithnFineBlock(point0, pxg, pyg, pzg, direction,faceTag);
+ 
+            }
+            else
+            {
+               
+// Note to shams put your Coarse update here. the current element is coarse (update method for coarse) 
+// so need to update the coarse, use point0  
+//                swapWithHigherLevelCousin( direction, point0, ptrs, globalKey, seednbrkey, index, combinedlevel, count, sendReq, rcvReq );
+            
+		//Modified by : Shams          
+		//My neighbor is at a higher level  
+        bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
+		int faceTag = loc;
+		Intrp.updateRcvdGhstValWithnCoarseBlock(point0, pxg, pyg, pzg, direction,faceTag);
+ 
+			 }
+          }
+
+
+#endif
+        }
+
+        it3 = std::next( it3, 1 );
+    }
+#endif
+
+}
+
+
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::quadInterpTransDirXdirectionSiblings( T &proc )
+{
+    real          XYZ[6];
+    morton<N>     key, sibkey;
+    Q *           point0;
+    Q *           point1;
+    bitvector<M>  nbr;
+    uint          level, siblevel;
+    int           maxSize;
+    int           count = 0;
+    morton<N + M> globalKey;
+    morton<M>     seedkey;
+    morton<M>     seednbrkey;
+    morton<N>     nbrkey;
+    uint          direction = 0;
+    uint          seedLevel, nbrseedlevel;
+    uint          topologylevel;
+    uint          mylevel, combinedlevel;
+    uint          changedirectionlevel;
+    uint          counter, nbrlevel;
+    uint          counthlevel = 0;
+
+    int          offset = direction + 1;
+
+
+    uint              realLevel;
+    uint              combinedLevel;
+    int               estimatedNbrLevel;
+    int               loc, in0, in1;
+    int               flag;
+    vector<morton<N>> nbrs;
+    vector<morton<M>> nbrs0;
+    vector<Q *>       ptrs;
+    count = 0;
+    int index[4];
+    //  **********************************************************************
+    //  first loop looks for the seed that does not have any refinement in it
+    //  *********************************************************************
+    auto it3 = seeds.begin();
+#if ( 1 )
+    // loop over all the tree lists,
+    for ( auto it = trees.begin(); it != trees.end(); it++ )
+    {
+        //        auto it=trees.begin();
+        count = 0;
+        // retrieve the seed key
+        seedkey = ( *it3 );
+        proc.level( seedkey, &topologylevel );
+
+       // loop over tree elements that has grown in each seed
+
+        for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+        {
+            //            auto it2=(*it).begin();
+
+            key = ( it2->first );
+
+           point0 = it2->second;
+            ( *it ).level( key, &mylevel );
+
+            combinedlevel = mylevel + topologylevel;
+
+
+            extractSameGlobalLevelSiblingInfo( proc, seedkey, key, topologylevel, mylevel, direction, globalKey, seednbrkey, nbrkey,
+                                               nbrseedlevel );
+
+            estimatedNbrLevel = ( (int)mylevel + (int)topologylevel - (int)nbrseedlevel );
+    
+          
+          flag = extractRealNbrInfo( seednbrkey, nbrkey, estimatedNbrLevel, realLevel );
+            // continue if you do not own the seed, or else stack this in a list to be communicated,
+            // this is where parallel communication should occur
+
+            //cout << GREEN << " flag " << flag << endl;
+            if ( flag == -1  )
+            {
+                continue;
+            }
+
+       if(flag==3)
+        {
+     
+// notes for shams 
+// write a function to add q=q+c3*phi3, use point0
+// here is the function to fill in
+
+		//Modified by : Shams          
+		//My neighbor is at a higher level  
+        bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
+		int faceTag = loc;
+		Intrp.updateRcvdGhstValWithnCoarseBlock(point0, pxg, pyg, pzg, direction,faceTag);
+ 
+		}
+ 
+        else
+        {
+
+#if(1)
+           // if(flag!=3){
+            constructTrueNbrKeysSiblings( seednbrkey, nbrseedlevel, nbrkey, realLevel, direction, nbrs, flag );
+
+           if ( nbrs.size() == 4 )
+            {
+// notes for shams 
+// write a function to add q=q+c3*phi3, use point0
+// here is the function to fill in
+// updateGhostValeueForCoarse(  point0, ..... );
+// swapWithHigher( direction, point0, ptrs, globalKey, seednbrkey, index, combinedlevel, count, sendReq, rcvReq );/
+
+	
+
+
+		//Modified by : Shams          
+		//My neighbor is at a higher level  
+        bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
+		int faceTag = loc;
+		Intrp.updateRcvdGhstValWithnCoarseBlock(point0, pxg, pyg, pzg, direction,faceTag);
+ 
+
+
+            }
+#endif   
+        }
+
+        }
+
+
+        it3 = std::next( it3, 1 );
+        //   }
+       // cout << RED << " counter =  " << RESET << count << endl;
+    }
+#endif
+
+   // cout << RED << " counter higher level =  " << RESET << counthlevel << endl;
+}
+
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::quadInterpTransDirYdirectionSiblings( T &proc )
+{
+    real          XYZ[6];
+    morton<N>     key, sibkey;
+    Q *           point0;
+    Q *           point1;
+    bitvector<M>  nbr;
+    uint          level, siblevel;
+    int           maxSize;
+    int           count = 0;
+    morton<N + M> globalKey;
+    morton<M>     seedkey;
+    morton<M>     seednbrkey;
+    morton<N>     nbrkey;
+    uint          direction = 1;
+    uint          seedLevel, nbrseedlevel;
+    uint          topologylevel;
+    uint          mylevel, combinedlevel;
+    uint          changedirectionlevel;
+    uint          counter, nbrlevel;
+    uint          counthlevel = 0;
+
+    int          offset = direction + 1;
+
+
+    uint              realLevel;
+    uint              combinedLevel;
+    int               estimatedNbrLevel;
+    int               loc, in0, in1;
+    int               flag;
+    vector<morton<N>> nbrs;
+    vector<morton<M>> nbrs0;
+    vector<Q *>       ptrs;
+    count = 0;
+    int index[4];
+    //  **********************************************************************
+    //  first loop looks for the seed that does not have any refinement in it
+    //  *********************************************************************
+    auto it3 = seeds.begin();
+#if ( 1 )
+    // loop over all the tree lists,
+    for ( auto it = trees.begin(); it != trees.end(); it++ )
+    {
+        //        auto it=trees.begin();
+        count = 0;
+        // retrieve the seed key
+        seedkey = ( *it3 );
+        proc.level( seedkey, &topologylevel );
+
+       // loop over tree elements that has grown in each seed
+
+        for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+        {
+            //            auto it2=(*it).begin();
+
+            key = ( it2->first );
+
+           point0 = it2->second;
+            ( *it ).level( key, &mylevel );
+
+            combinedlevel = mylevel + topologylevel;
+
+
+            extractSameGlobalLevelSiblingInfo( proc, seedkey, key, topologylevel, mylevel, direction, globalKey, seednbrkey, nbrkey,
+                                               nbrseedlevel );
+
+            estimatedNbrLevel = ( (int)mylevel + (int)topologylevel - (int)nbrseedlevel );
+    
+          
+          flag = extractRealNbrInfo( seednbrkey, nbrkey, estimatedNbrLevel, realLevel );
+            // continue if you do not own the seed, or else stack this in a list to be communicated,
+            // this is where parallel communication should occur
+
+            //cout << GREEN << " flag " << flag << endl;
+            if ( flag == -1  )
+            {
+                continue;
+            }
+
+       if(flag==3)
+        {
+     
+// notes for shams. update coarse 
+// write a function to add q=q+c3*phi3, use point0
+// here is the function to fill in
+//           updateGhostValeueForCoarse(  point0, ..... );
+ 
+		//Modified by : Shams          
+		//My neighbor is at a higher level  
+        bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
+		int faceTag = loc;
+		Intrp.updateRcvdGhstValWithnCoarseBlock(point0, pxg, pyg, pzg, direction,faceTag);
+ 
+            
+        } 
+        else
+        {
+
+#if(1)
+           // if(flag!=3){
+            constructTrueNbrKeysSiblings( seednbrkey, nbrseedlevel, nbrkey, realLevel, direction, nbrs, flag );
+
+           if ( nbrs.size() == 4 )
+            {
+// notes for shams 
+// update coarse
+// write a function to add q=q+c3*phi3, use point0
+// here is the function to fill in
+//           updateGhostValeueForCoarse(  point0, ..... );
+// swapWithHigher( direction, point0, ptrs, globalKey, seednbrkey, index, combinedlevel, count, sendReq, rcvReq );
+//
+		//Modified by : Shams          
+		//My neighbor is at a higher level  
+        bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
+		int faceTag = loc;
+		Intrp.updateRcvdGhstValWithnCoarseBlock(point0, pxg, pyg, pzg, direction,faceTag);
+ 
+
+            }
+#endif   
+        }
+
+        }
+
+
+        it3 = std::next( it3, 1 );
+        //   }
+       // cout << RED << " counter =  " << RESET << count << endl;
+    }
+#endif
+
+   // cout << RED << " counter higher level =  " << RESET << counthlevel << endl;
+}
+
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::quadInterpTransDirZdirectionSiblings( T &proc )
+{
+    real          XYZ[6];
+    morton<N>     key, sibkey;
+    Q *           point0;
+    Q *           point1;
+    bitvector<M>  nbr;
+    uint          level, siblevel;
+    int           maxSize;
+    int           count = 0;
+    morton<N + M> globalKey;
+    morton<M>     seedkey;
+    morton<M>     seednbrkey;
+    morton<N>     nbrkey;
+    uint          direction = 2;
+    uint          seedLevel, nbrseedlevel;
+    uint          topologylevel;
+    uint          mylevel, combinedlevel;
+    uint          changedirectionlevel;
+    uint          counter, nbrlevel;
+    uint          counthlevel = 0;
+
+    int          offset = direction + 1;
+
+
+    uint              realLevel;
+    uint              combinedLevel;
+    int               estimatedNbrLevel;
+    int               loc, in0, in1;
+    int               flag;
+    vector<morton<N>> nbrs;
+    vector<morton<M>> nbrs0;
+    vector<Q *>       ptrs;
+    count = 0;
+    int index[4];
+    //  **********************************************************************
+    //  first loop looks for the seed that does not have any refinement in it
+    //  *********************************************************************
+    auto it3 = seeds.begin();
+#if ( 1 )
+    // loop over all the tree lists,
+    for ( auto it = trees.begin(); it != trees.end(); it++ )
+    {
+        //        auto it=trees.begin();
+        count = 0;
+        // retrieve the seed key
+        seedkey = ( *it3 );
+        proc.level( seedkey, &topologylevel );
+
+       // loop over tree elements that has grown in each seed
+
+        for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+        {
+            //            auto it2=(*it).begin();
+
+            key = ( it2->first );
+
+           point0 = it2->second;
+            ( *it ).level( key, &mylevel );
+
+            combinedlevel = mylevel + topologylevel;
+
+
+            extractSameGlobalLevelSiblingInfo( proc, seedkey, key, topologylevel, mylevel, direction, globalKey, seednbrkey, nbrkey,
+                                               nbrseedlevel );
+
+            estimatedNbrLevel = ( (int)mylevel + (int)topologylevel - (int)nbrseedlevel );
+    
+          
+          flag = extractRealNbrInfo( seednbrkey, nbrkey, estimatedNbrLevel, realLevel );
+            // continue if you do not own the seed, or else stack this in a list to be communicated,
+            // this is where parallel communication should occur
+
+            //cout << GREEN << " flag " << flag << endl;
+            if ( flag == -1  )
+            {
+                continue;
+            }
+
+       if(flag==3)
+        {
+     
+// notes for shams 
+// update coarse
+// write a function to add q=q+c3*phi3, use point0
+// here is the function to fill in
+//           updateGhostValeueForCoarse(  point0, ..... );
+  
+		//Modified by : Shams          
+		//My neighbor is at a higher level  
+        bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
+		int faceTag = loc;
+		Intrp.updateRcvdGhstValWithnCoarseBlock(point0, pxg, pyg, pzg, direction,faceTag);
+ 
+           
+        } 
+        else
+        {
+
+#if(1)
+           // if(flag!=3){
+            constructTrueNbrKeysSiblings( seednbrkey, nbrseedlevel, nbrkey, realLevel, direction, nbrs, flag );
+
+           if ( nbrs.size() == 4 )
+            {
+// notes for shams 
+// update coarse
+// write a function to add q=q+c3*phi3, use point0
+// here is the function to fill in
+//           updateGhostValeueForCoarse(  point0, ..... );
+// swapWithHigher( direction, point0, ptrs, globalKey, seednbrkey, index, combinedlevel, count, sendReq, rcvReq );
+//
+		//Modified by : Shams          
+		//My neighbor is at a higher level  
+        bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
+		int faceTag = loc;
+		Intrp.updateRcvdGhstValWithnCoarseBlock(point0, pxg, pyg, pzg, direction,faceTag);
+ 
+
+            }
+#endif   
+        }
+
+        }
+
+
+        it3 = std::next( it3, 1 );
+        //   }
+       // cout << RED << " counter =  " << RESET << count << endl;
+    }
+#endif
+
+   // cout << RED << " counter higher level =  " << RESET << counthlevel << endl;
+}
+
+
+
+
+
+
+
+
+
+// no uncertainty regarding seed level as all procs have access to this proxy tree
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::extractSameGlobalLevelSiblingInfo( T &proc, const morton<M> seedkey, const morton<N> key,
+                                                                                 const uint topologylevel, const uint mylevel,
+                                                                                 const uint direction, morton<N + M> &globalKey,
+                                                                                 morton<M> &seednbrkey, morton<N> &nbrkey,
+                                                                                 uint &nbrseedlevel )
+{
+    //    morton<N + M> globalKey;
+    globalKey = 0;
+    uint combinedlevel;
+    seednbrkey=0;
+
+    for ( uint j = 0; j < 3 * topologylevel; j++ )
+    {
+        globalKey[N + M - j - 1] = seedkey[M - j - 1];
+    }
+
+    combinedlevel = topologylevel + mylevel;
+
+    for ( uint j = 0; j < 3 * mylevel; j++ )
+    {
+        globalKey[N + M - 3 * (topologylevel)-j - 1] = key[N - j - 1];
+    }
+
+    // cout << " global key before flip " << globalKey << " combinedlevel " << combinedlevel << endl;
+    // continue for global boundary elements
+
+    flipForSibling( globalKey, combinedlevel, direction );
+
+    // cout << " global key after flip  " << globalKey << "  " << endl;
+
+   // getNbrSeedLevel( globalKey, maxProcLevel, &nbrseedlevel, proc );
+    int maxLevel=topologylevel+1;
+    getNbrSeedLevel( globalKey,maxLevel , &nbrseedlevel, proc );
+
+// disallow levels higher than topologylevel+1 
+//
+ //   cout << " nbrSeedlevel " << nbrseedlevel << " toplevel  " << topologylevel <<endl;
+
+    if(nbrseedlevel>topologylevel+1)
+    {
+//       cout<<"here " <<endl;
+//       exit(0);
+       nbrseedlevel=topologylevel+1;
+    }
+
+    //cout << "Max Proc Level " << maxProcLevel << endl;
+
+    for ( uint k = 0; k < 3 * nbrseedlevel; k++ )
+    {
+        seednbrkey[M - 1 - k] = globalKey[N + M - k - 1];
+        // cout<<RED<<combinedkey[NM-k-1]<<RESET<<endl;
+    }
+
+    nbrkey = 0;
+
+    for ( uint k = 0; k < N; k++ )
+    {
+        nbrkey[N - k - 1] = globalKey[N + M - 3 * (nbrseedlevel)-1 - k];
+    }
+   
+   // cout << RED<<seednbrkey <<RESET<<endl;
+// this added to use the actual morton code so need to flip back to recover the code for self 
+    flipForSibling( globalKey, combinedlevel, direction );
+
+}
+
+// no uncertainty regarding seed level as all procs have access to this proxy tree
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+int TemplateForest<N, Nvalue, M, Mvalue, T>::extractSameGlobalLevelCousinInfo( T &proc, const morton<M> seedkey, const morton<N> key,
+                                                                               const uint topologylevel, uint mylevel, uint direction,
+                                                                               uint changedirectionlevel, morton<N + M> &globalKey,
+                                                                               morton<M> &seednbrkey, morton<N> &nbrkey,
+                                                                               uint &nbrseedlevel )
+{
+    globalKey = 0;
+    uint combinedlevel;
+    seednbrkey=0;
+    int  rtn = 0;
+
+    for ( uint j = 0; j < 3 * topologylevel; j++ )
+    {
+        globalKey[N + M - j - 1] = seedkey[M - j - 1];
+    }
+
+    combinedlevel = topologylevel + mylevel;
+
+    for ( uint j = 0; j < 3 * mylevel; j++ )
+    {
+        globalKey[N + M - 3 * (topologylevel)-j - 1] = key[N - j - 1];
+    }
+
+    // cout << " global key before flip " << globalKey << " combinedlevel " << combinedlevel << endl;
+    // continue for global boundary elements
+
+    findFlipLevel( globalKey, &combinedlevel, &changedirectionlevel, &direction );
+
+    // ignore boundary elements
+    if ( changedirectionlevel == 0 )
+    {
+       // cout << " element is boundary element" << endl;
+        rtn = -1;
+    }
+
+   // cout << " flip level " << changedirectionlevel << endl;
+    flipForNbr( globalKey, &combinedlevel, &changedirectionlevel, &direction );
+#if ( 0 )
+    cout << " global key after flip  " << globalKey << "  " << endl;
+#endif
+    getNbrSeedLevel( globalKey, maxProcLevel, &nbrseedlevel, proc );
+
+#if ( 0 )
+    cout << " nbrSeedlevel " << nbrseedlevel << "  " << endl;
+    cout << "Max Proc Level " << maxProcLevel << endl;
+#endif
+
+    if(nbrseedlevel>topologylevel+1)
+    {
+//       cout<<"here " <<endl;
+//       exit(0);
+       nbrseedlevel=topologylevel+1;
+    }
+
+    for ( uint k = 0; k < 3 * nbrseedlevel; k++ )
+    {
+        seednbrkey[M - 1 - k] = globalKey[N + M - k - 1];
+        // cout<<RED<<combinedkey[NM-k-1]<<RESET<<endl;
+    }
+
+    nbrkey = 0;
+
+    for ( uint k = 0; k < N; k++ )
+    {
+        nbrkey[N - k - 1] = globalKey[N + M - 3 * (nbrseedlevel)-1 - k];
+    }
+
+// flip back to restore the globalKey
+    flipForNbr( globalKey, &combinedlevel, &changedirectionlevel, &direction );
+    return ( rtn );
+}
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+bool TemplateForest<N, Nvalue, M, Mvalue, T>::isBoundary( T &proc, const morton<M> seedkey, const morton<N> key, const uint direction,const uint level )
+{
+    bool bol = false;
+    auto it  = trees.begin();
+    uint mylevel;
+
+    if ( proc.isBoundary( seedkey, direction ) && ( *it ).isBoundary( key, direction ) )
+    {
+
+         if(key[N-1-direction]==seedkey[M-1-direction] || level==0 )
+         {
+           bol = true;
+         }
+    }
+
+    return ( bol );
+}
+
+// note for shams for imposing boundary condition 
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::imposeBoundaryConditionXdirection( T &proc )
+{
+    auto it  = trees.begin();
+    morton<M> seedkey;
+    morton<N> key;
+    real XYZ[6];
+   
+  // for X-directionmposeBoundaryConditions 
+   int direction=0;
+
+   auto it3=seeds.begin();   
+
+   uint mylevel;
+
+   Q* point0;
+
+    for ( auto it = trees.begin(); it != trees.end(); it++ )
+    {
+        seedkey = ( *it3 );
+
+     if(proc.isBoundary(seedkey,direction )) 
+     {
+        for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+        {
+            key = ( it2->first );
+           
+			 ( *it ).level( key, &mylevel );
+             ( *it ).enclosingBox( key, XYZ ); // need dx for Neumann boundary condition
+ 
+            if(( *it ).isBoundary( key, direction )) 
+            { // if level==0 or the bits are similar at a given direction
+            	if(key[N-1-direction]==seedkey[M-1-direction] || mylevel==0 )
+            	{
+              	 	point0=it2->second;
+
+              		if(seedkey[M-1-direction]==0)
+               {
+				// faceTag =0, corresponding to bc[0], use point0
+
+				S.imposeBoundaryXdirection(point0,0,XYZ);
+              }
+             else
+             {
+				// faceTag =1, corresponding to bc[1], use point0
+				S.imposeBoundaryXdirection(point0,1,XYZ);
+              }
+                
+           	}
+          }
+        }
+
+      }
+        it3 = std::next( it3, 1 );
+    }
+
+}
+
+// note for shams for imposing boundary condition 
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::imposeBoundaryConditionYdirection( T &proc )
+{
+    auto it  = trees.begin();
+    morton<M> seedkey;
+    morton<N> key;
+	real XYZ[6];       
+  // for X-direction 
+   int direction=1;
+   auto it3=seeds.begin();   
+   uint mylevel;
+   Q *point0;
+    for ( auto it = trees.begin(); it != trees.end(); it++ )
+    {
+        seedkey = ( *it3 );
+
+     if(proc.isBoundary(seedkey,direction )) 
+     {
+        for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+        {
+            key = ( it2->first );
+            ( *it ).level( key, &mylevel );
+           ( *it ).enclosingBox( key, XYZ ); 
+            if(( *it ).isBoundary( key, direction )) 
+            {// if level==0 or the bits are similar at a given direction
+            if(key[N-1-direction]==seedkey[M-1-direction] || mylevel==0 )
+            {
+               point0=it2->second;
+			 // here call your S.imposeBoundaryYdirection
+              if(seedkey[M-1-direction]==0)
+              {
+				// faceTag =0, corresponding to bc[2]
+				S.imposeBoundaryYdirection(point0,0,XYZ);
+              }
+             else
+             {
+				// faceTag =1, corresponding to bc[3]
+
+				S.imposeBoundaryYdirection(point0,1,XYZ);
+             }                
+            
+			}
+           }
+        }
+      }
+
+        it3 = std::next( it3, 1 );
+    }
+
+}
+
+
+// note for shams for imposing boundary condition 
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::imposeBoundaryConditionZdirection( T &proc )
+{
+    auto it  = trees.begin();
+    morton<M> seedkey;
+    morton<N> key;
+    real XYZ[6];
+ 
+  // for X-direction 
+   int direction=2;
+   auto it3=seeds.begin();   
+   uint mylevel;
+   Q *point0;
+    for ( auto it = trees.begin(); it != trees.end(); it++ )
+    {
+        seedkey = ( *it3 );
+
+     if(proc.isBoundary(seedkey,direction )) 
+     {
+        for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+        {
+            key = ( it2->first );
+            ( *it ).level( key, &mylevel );
+			( *it ).enclosingBox( key, XYZ );
+
+            if(( *it ).isBoundary( key, direction )) 
+            {// if level==0 or the bits are similar at a given direction
+            if(key[N-1-direction]==seedkey[M-1-direction] || mylevel==0 )
+            {
+            point0=it2->second;
+			 // here call your S.imposeBoundaryZdirection, use poin0
+              if(seedkey[M-1-direction]==0)
+              {
+			// faceTag =0, corresponding to bc[4]
+				S.imposeBoundaryZdirection(point0,0,XYZ);
+              }
+             else
+             {
+				// faceTag =1, corresponding to bc[5]
+
+				S.imposeBoundaryZdirection(point0,1,XYZ);
+             }  
+                        
+			}
+           }
+        }
+      }
+        it3 = std::next( it3, 1 );
+    }
+
+}
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::imposeBoundaryConditions( T &proc )
+{
+
+imposeBoundaryConditionXdirection(proc);
+imposeBoundaryConditionYdirection(proc);
+imposeBoundaryConditionZdirection(proc);
+
+}
+
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+int TemplateForest<N, Nvalue, M, Mvalue, T>::extractRealNbrInfo( morton<M> seednbrkey, morton<N> nbrkey, const int estimatedNbrLevel,
+                                                                 uint &realLevel )
+{
+    uint counter  = 0;
+    uint nbrlevel = 0;
+    int  flag;
+
+    // flag  0 means same global level
+    // flag  2 means the neighbor has higher level
+    // flag  1 means the neighbor has lower level
+    // flag -1 means current processor does not own the seed and hence need to communicate
+    // flag 3  means estimated leve is -1 due to the fact that tree has one node only
+
+//       cout << RED << " seed nbr key " << seednbrkey << " nbrkey " << nbrkey <<  RESET << endl;
+
+ //       cout<< " bool " <<  isInSeed( seednbrkey, &counter ) <<endl;
+
+    if ( isInSeed( seednbrkey, &counter ) )
+    {
+        auto it2 = std::next( trees.begin(), counter );
+
+// flag 3 is reserved for the case where estimated level is -1
+    if(estimatedNbrLevel<0)
+   {
+    realLevel=0;
+    flag=3;
+    return(flag);
+    }
+        auto it4 = ( *it2 ).find( nbrkey );
+
+        if ( it4 != ( *it2 ).end() )
+        {
+            ( *it2 ).level( nbrkey, &nbrlevel );
+            // (*it2).printMesh();
+        //    cout << RED " nbrevel " << nbrlevel << RESET << endl;
+
+            if ( nbrlevel == estimatedNbrLevel )
+            {
+                realLevel = nbrlevel;
+                flag      = 0;
+            }
+            else if ( nbrlevel > estimatedNbrLevel )
+            {
+                flag      = 2;
+               // realLevel = nbrlevel;
+                realLevel =  estimatedNbrLevel+1;
+            }
+            // cousins might lead to a situation where the estimated element is not in the list, that implicitly implies that we need to
+            // reduce one level so the estimated level is off by one, meaning reduce the estimated level for that one
+            else if ( nbrlevel < estimatedNbrLevel )
+            {
+                // reduce one level
+              //  cout << " real vs estimated " << nbrlevel << " " << estimatedNbrLevel << endl;
+                flag      = 1;
+                //realLevel = nbrlevel;
+                realLevel = estimatedNbrLevel-1;
+            }
+        }
+        else
+        {
+            flag      = 1;
+            realLevel = estimatedNbrLevel - 1;
+          //  cout << RED << " element does not exist " << RESET << endl;
+            //       exit(0);
+        }
+    }
+    else
+    {
+        flag = -1;
+        cout << RED" communicate with other processor " <<RESET<< endl;
+    }
+    // cout<<" realLevel "<<realLevel<<endl;
+
+    return ( flag );
+}
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::constructTrueNbrKeysCousins( morton<M> seednbrkey, uint nbrseedlevel, morton<N> nbrkey,
+                                                                           uint realLevel, uint direction, vector<morton<N>> &nbr,
+                                                                           int flag )
+{
+    nbr.clear();
+    nbr.shrink_to_fit();
+    auto      it = trees.begin();
+    morton<N> kt = nbrkey;
+
+    //  cout<<" realLevel "<<realLevel<<endl;
+    //  bitSign removes singularity when a seed has only root and no refinement is performed in that
+    int signBit = 0;
+    if ( seednbrkey[M - 1 - 3 * ( nbrseedlevel - 1 ) - direction] == 1 )
+    {
+        signBit = 1;
+    }
+
+    /*
+        cout << " ?????????? index" << M - 1 - 3 * ( nbrseedlevel - 1 ) - direction << " "
+             << seednbrkey[M - 1 - 3 * ( nbrseedlevel - 1 ) - direction] << endl;
+    */
+
+    if ( flag == 2 )
+    {
+      //cout<<"construct "<< nbrkey<<endl;
+
+        ( *it ).constructNonlocalHigherLevelNbrs( nbrkey, realLevel - 1,signBit, direction, nbr );
+    }
+    // real vele implies to zero out one higher level
+    else if ( flag == 1 )
+    {
+        kt[M - 3 * (realLevel)-1] = 0;
+        kt[M - 3 * (realLevel)-2] = 0;
+        kt[M - 3 * (realLevel)-3] = 0;
+        nbr.push_back( kt );
+    }
+    else if ( flag == 0 )
+    {
+        nbr.push_back( nbrkey );
+    }
+   // cout << " estimated key  " << nbrkey << " key after adjustment " << kt << " true level  " << realLevel << endl;
+}
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::constructTrueNbrKeysSiblings( morton<M> seednbrkey, uint nbrseedlevel, morton<N> nbrkey,
+                                                                            uint realLevel, uint direction, vector<morton<N>> &nbr,
+                                                                            int flag )
+{
+    nbr.clear();
+    nbr.shrink_to_fit();
+    auto      it = trees.begin();
+    morton<N> kt = nbrkey;
+
+    //  cout<<" realLevel "<<realLevel<<endl;
+    //  bitSign removes singularity when a seed has only root and no refinement is performed in that
+    int signBit = 0;
+
+    if ( seednbrkey[M - 1 - 3 * ( nbrseedlevel - 1 ) - direction] == 1 )
+    {
+        signBit = 1;
+    }
+
+    /*
+        cout << " ?????????? index" << M - 1 - 3 * ( nbrseedlevel - 1 ) - direction << " "
+             << seednbrkey[M - 1 - 3 * ( nbrseedlevel - 1 ) - direction] << endl;
+    */
+
+    if ( flag == 2 )
+    {
+        ( *it ).constructHigherLevelNbrs( nbrkey, realLevel - 1, signBit, direction, nbr );
+    }
+    // flaf 1 does not occur at sibling
+    else if ( flag == 1 )
+    {
+        kt[M - 3 * (realLevel)-1] = 0;
+        kt[M - 3 * (realLevel)-2] = 0;
+        kt[M - 3 * (realLevel)-3] = 0;
+        nbr.push_back( kt );
+    }
+    else if ( flag == 0 )
+    {
+        nbr.push_back( nbrkey );
+    }
+/*
+   else if (flag==3)
+    {
+    morton<M> kt0 = nbrkey;
+    kt0=seednbrkey;
+    kt0[M - 3 * (nbrseedlevel-1)-direction-1] = 0;
+    //kt0.flip(M - 3 * (nbrseedlevel-2)-direction-1);
+
+    morton<M> nbr[4];
+    (*it).constructHigherLevelNbrs( kt0, nbrseedlevel-1, direction, nbr );
+  
+    cout<<"flag 3 segment " <<nbr[0]<<endl;
+    cout<<"flag 3 segment " <<nbr[1]<<endl;
+    cout<<"flag 3 segment " <<nbr[2]<<endl;
+    cout<<"flag 3 segment " <<nbr[3]<<endl;
+
+    }   
+*/
+
+    // cout<<" realLevel "<<realLevel<<endl;
+}
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::getPointers( morton<M> seednbrkey, vector<morton<N>> &nbrs, vector<Q *> &ptrs )
+{
+    uint counter;
+    // find the
+
+    isInSeed( seednbrkey, &counter );
+
+    auto it0 = std::next( trees.begin(), counter );
+
+    //  auto it1 = ( *it0 ).find( nbrkey );
+
+    ptrs.clear();
+    ptrs.shrink_to_fit();
+
+   // cout << " inside ptrs  " << nbrs.size() << endl;
+
+    for ( int i = 0; i < nbrs.size(); i++ )
+    {
+        auto it2 = ( *it0 ).find( nbrs.at( i ) );
+      //  cout << seednbrkey << " " << nbrs.at( i ) << endl;
+        if ( it2 == ( *it0 ).end() )
+        {
+            cout << "element not found" << endl;
+        }
+        ptrs.push_back( it2->second );
+    }
+}
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::getPointersForNegtiveEstimate( morton<M> seednbrkey,uint nbrseedlevel,uint direction, vector<morton<M>> &nbrs ,vector<Q *> &ptrs )
+{
+    morton<M> kt0;
+    uint counter;
+    kt0=seednbrkey;
+    kt0[M - 3 * (nbrseedlevel-1)-direction-1] = 0;
+    morton<M> nbr[4];
+    ptrs.clear();
+    ptrs.shrink_to_fit();
+
+    nbrs.clear();
+    nbrs.shrink_to_fit();
+
+    auto      it = trees.begin();
+    (*it).constructHigherLevelNbrs( kt0, nbrseedlevel-1, direction, nbr );
+  
+    
+    for(int i=0;i<4;i++)
+    {
+//    cout<<"======= "<<nbr[i]<<endl;
+
+    isInSeed( nbr[i], &counter );
+
+    auto it0 = std::next( trees.begin(), counter );
+    
+    auto it2 = ( *it0 ).find(0);
+    
+    ptrs.push_back( it2->second );
+    nbrs.push_back(nbr[i]);
+  //  cout<<"======= "<<it2->second<<endl;
+    }
+
+}
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::getPointersForNegtiveEstimateCousin( morton<M> seednbrkey,uint nbrseedlevel,uint direction, vector<morton<M>> &nbrs ,vector<Q *> &ptrs )
+{
+    morton<M> kt0;
+    uint counter;
+    kt0=seednbrkey;
+    kt0[M - 3 * (nbrseedlevel-1)-direction-1] = 0;
+    morton<M> nbr[4];
+    ptrs.clear();
+    ptrs.shrink_to_fit();
+
+    nbrs.clear();
+    nbrs.shrink_to_fit();
+
+    auto      it = trees.begin();
+    (*it).constructNonlocalHigherLevelNbrs( kt0, nbrseedlevel-1, direction, nbr );
+  
+    
+    for(int i=0;i<4;i++)
+    {
+    //cout<<"======= "<<nbr[i]<<endl;
+    isInSeed( nbr[i], &counter );
+
+    auto it0 = std::next( trees.begin(), counter );
+    
+    auto it2 = ( *it0 ).find(0);
+    
+    ptrs.push_back( it2->second );
+    nbrs.push_back(nbr[i]);
+    //cout<<"======= "<<it2->second<<endl;
+    }
+
+}
+
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::swapGhostCellsXdirectionSiblings( T &proc )
+{
+    real          XYZ[6];
+    morton<N>     key, sibkey;
+    Q *           point0;
+    Q *           point1;
+    bitvector<M>  nbr;
+    uint          level, siblevel;
+    int           maxSize;
+    int           count = 0;
+    morton<N + M> globalKey;
+    morton<M>     seedkey;
+    morton<M>     seednbrkey;
+    morton<N>     nbrkey;
+    uint          direction = 0;
+    uint          seedLevel, nbrseedlevel;
+    uint          topologylevel;
+    uint          mylevel, combinedlevel;
+    uint          changedirectionlevel;
+    uint          counter, nbrlevel;
+    uint          counthlevel = 0;
+
+   /* 
+        cout<<"========================Topology=================== "<<endl;
+
+        proc.printMesh();
+
+        cout<<"============================================ "<<endl;
+
+        for ( auto it = trees.begin(); it != trees.end(); it++ )
+        {
+            (*it).printMesh();
+
+        cout<<"------------------------------------------------ "<<endl;
+        }
+
+        cout<<"============================================ "<<endl;
+*/
+    for ( auto it = trees.begin(); it != trees.end(); it++ )
+    {
+        for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+        {
             count++;
         }
     }
+   // cout << RED << " counter =  " << RESET << count << endl;
 
-    for ( auto it = seeds.begin(); it != seeds.end(); it++ )
+    MPI_Request *sendReq;
+    MPI_Request *rcvReq;
+    MPI_Status * stat;
+    int          offset = direction + 1;
+
+    sendReq = new MPI_Request[count];
+    rcvReq  = new MPI_Request[count];
+    stat    = new MPI_Status[count];
+
+    uint              realLevel;
+    uint              combinedLevel;
+    int               estimatedNbrLevel;
+    int               loc, in0, in1;
+    int               flag;
+    vector<morton<N>> nbrs;
+    vector<morton<M>> nbrs0;
+    vector<Q *>       ptrs;
+    count = 0;
+    int index[4];
+    //  **********************************************************************
+    //  first loop looks for the seed that does not have any refinement in it
+    //  *********************************************************************
+    auto it3 = seeds.begin();
+#if ( 1 )
+    // loop over all the tree lists,
+    for ( auto it = trees.begin(); it != trees.end(); it++ )
     {
-       proc.enclosingBox( (*it), X );
+        //        auto it=trees.begin();
+        count = 0;
+        // retrieve the seed key
+        seedkey = ( *it3 );
+        proc.level( seedkey, &topologylevel );
 
-       bol=true;
+      //  cout << RED << " seed key " << seedkey << " seedlevel " << topologylevel << RESET << endl;
 
-     for ( auto it1 = trees.begin(); it1 != trees.end(); it1++ )
-    {
-            //cout<<" my_rank "<<com.myrank <<"  "<<it->first<<" "<<it->second[0]<<endl;
-             (*it1).getCoords(X0);
-    
-          // cout<<" !!!!! "<<X[0]<<" "<<X[1]<<endl;
+        // this is for the condition that there are no trees grown in the seed
+        /*
+             if ( ( *it ).size() > 1 )
+                {
+                    continue;
+                }
+        */
+        // loop over tree elements that has grown in each seed
 
-            if((fabs(X[0]-X0[0])<1.e-6) && (fabs(X[1]-X0[1])<1.e-6) && (fabs(X[2]-X0[2])<1.e-6) && (fabs(X[3]-X0[3])<1.e-6) && (fabs(X[4]-X0[4])<1.e-6) &&  (fabs(X[5]-X0[5]))<1.e-6 )
-            {
-//               cout<<" inside"<<endl;
-               bol=false;
-//               cnt++;
-               break;              
-            }
-      }
+        for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+        {
+            //            auto it2=(*it).begin();
 
-      if(bol==true)
-       {
-            XC[0] = ( X[0] + X[1] ) * 0.5;
-            XC[1] = ( X[2] + X[3] ) * 0.5;
-            XC[2] = ( X[4] + X[5] ) * 0.5;
+            key = ( it2->first );
 
-            len[0] = fabs( X[1] - X[0] );
-            len[1] = fabs( X[3] - X[2] );
-            len[2] = fabs( X[5] - X[4] );
-          trees.push_back( Tree<N, Nvalue>( len, XC ) );
-        }
+            // if this element is a boundary it will not have nonlocal neighbors
 
-    } 
- 
-            
+            // for siblings this is not required
+            /*
+                        if ( isBoundary( proc, seedkey, key, direction ) )
+                        {
+                            continue;
+                        }
+            */
+            point0 = it2->second;
+            ( *it ).level( key, &mylevel );
 
-         //   trees.push_back( Tree<N, Nvalue>( len, XC ) );
+            combinedlevel = mylevel + topologylevel;
 
-//            seeds.push_back( it->first );
-
-
- //           cout <<BLUE<< it->first << " XC " << XC[0] << " " << XC[1] << " " << XC[2] <<RESET<< endl;
-            count++;
-    
-   
- 
-
-
-
-
-   cout<<" count = "<<count<<endl;
-   cout<<" seeds size = "<<seeds.size()<<endl;
-   cout<<" trees size = "<<trees.size()<<endl;
-
-}
 
 /*
-template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
-void TemplateForest<N,Nvalue,M,Mvalue,T>::selectkeysToIgnore(T &proc, double xyz[6])
-{
+         if(combinedlevel!=3 || combinedlevel!=2 )
+          { 
+           for(uint i=0;i<(npx+1)*(npy+1)*(npz+1);i++)
+           {
+              point0[i].p=0.0;
+            }
+          continue;
+           }
+ 
+*/ 
+            // globalKey = 0;
+/*
+            cout << "================================================" << endl;
+            cout << RED << " seedkey " << seedkey << " key " << key << " seedlevel  " << topologylevel << " keylevel " << mylevel << RESET
+                 << endl;
+*/
+            extractSameGlobalLevelSiblingInfo( proc, seedkey, key, topologylevel, mylevel, direction, globalKey, seednbrkey, nbrkey,
+                                               nbrseedlevel );
+/*
+            cout << RED << " seed nbr key " << seednbrkey << " nbrkey " << nbrkey << " nbrseedlevel " << nbrseedlevel << RESET << endl;
+*/
+           //  cout<<" seed level "<< topologylevel<<"my level "<<mylevel<<" nbrseed level"<<endl;
 
-double center[6];
-bool bol0,bol1,bol2;
+            estimatedNbrLevel = ( (int)mylevel + (int)topologylevel - (int)nbrseedlevel );
+  //          cout << " estimated level  " << estimatedNbrLevel << endl;
 
-for(auto it=proc.begin();proc.end();it++ )
-{
-   key=it->first;
-  
-   Proc.centroid( key, center);
+       
 
-   bol0= (center[0] < xyz[1] && center[0]>xyz[0]); 
-   bol1= (center[1] < xyz[3] && center[1]>xyz[2]); 
-   bol2= (center[2] < xyz[5] && center[2]>xyz[4]); 
+            /* to avoid mesh level 0, need to debug later
+             *
+                        if(estimatedNbrLevel>=0)
+                        {
+                        flag = extractRealNbrInfo( seednbrkey, nbrkey, estimatedNbrLevel, realLevel );
+                        }
+                        else
+                        {
+                          flag=2;
+                          nbrkey=0;
+                          realLevel=1;
+                        }
 
-  if(bol0 && bol1 && bol2 )   
-  {
+            */
      
-  }
-}
+          
+          flag = extractRealNbrInfo( seednbrkey, nbrkey, estimatedNbrLevel, realLevel );
+            // continue if you do not own the seed, or else stack this in a list to be communicated,
+            // this is where parallel communication should occur
 
-}
+            //cout << GREEN << " flag " << flag << endl;
+            if ( flag == -1  )
+            {
+                continue;
+            }
+
+          /*   for(uint i=0;i<(npx+1)*(npy+1)*(npz+1);i++)
+           {
+           //   point0[i].p=0.0;
+            }
+          */
+        if(flag==3)
+        {
+
+              getPointersForNegtiveEstimate( seednbrkey,nbrseedlevel, direction, nbrs0,ptrs );
+              getSortedIndex(nbrs0,index );
+              swapWithHigher( direction, point0, ptrs, globalKey, seednbrkey, index, combinedlevel, count, sendReq, rcvReq );
+             
+        } 
+        else
+        {
+
+#if(1)
+           // if(flag!=3){
+            constructTrueNbrKeysSiblings( seednbrkey, nbrseedlevel, nbrkey, realLevel, direction, nbrs, flag );
+          //  }
+          //  else
+          //  {
+           //  }
+
+/*
+            cout << " true level  " << realLevel << " number of neighbors " << nbrs.size() << endl;
+            cout << GREEN << " ??????????????? " << globalKey << RESET << endl;
+            cout << "================================================" << endl;
+*/
+            // sibling can never have a level lower than its siblings, it is always same or greater
+            if ( nbrs.size() == 1 )
+            {
+                getPointers( seednbrkey, nbrs, ptrs );
+                //   cout << " inside " << ptrs.size() << endl;
+
+                point1 = ptrs.at( 0 );
+
+                swapSameLevel( direction, point0, point1, globalKey, seednbrkey, nbrs, combinedlevel, count, sendReq, rcvReq );
+            }
+            else
+            {
+                /*
+                            for(uint i=0;i<npx*npy*npz;i++)
+                            {
+                              point0[i]=0.0;
+                            }
+              */
+                /*
+                 * *********************************************************************************
+                              just to see if the element that has a finer mesh is detected correctly
+
+
+                              double co=-1.;
+                              S.initializeTrigonometric( point0, &co );
+                ************************************************************************************
+                */
+                counthlevel++;
+                //cout << "============= higher level =============" << endl;
+                getPointers( seednbrkey, nbrs, ptrs );
+/*
+             for(int k=0;k<4;k++){
+             for(uint i=0;i<(npx+1)*(npy+1)*(npz+1);i++)
+           {
+            
+             //point1 = ptrs.at( k );
+              ptrs[k][i].p=100.0;
+            }
+           }
 */
 
+                getSortedIndex(nbrs,index );
+                swapWithHigher( direction, point0, ptrs, globalKey, seednbrkey, index, combinedlevel, count, sendReq, rcvReq );
+            }
+#endif   
+        }
 
-template class TemplateForest< TREESIZE, real, PROCSIZE, uint, Tree<PROCSIZE, uint>>;
-//template class TemplateForest< TREESIZE, real, PROCSIZE, uint, FullTree<PROCSIZE, uint>>;
-template class TemplateForest<  TREESIZE, real, WSIZE, uint, FullTree<WSIZE, uint>>;
+        }
+
+        MPI_Waitall( count, rcvReq, stat );
+        MPI_Waitall( count, sendReq, stat );
+
+        it3 = std::next( it3, 1 );
+        //   }
+       // cout << RED << " counter =  " << RESET << count << endl;
+    }
+#endif
+
+   // cout << RED << " counter higher level =  " << RESET << counthlevel << endl;
+#if ( 1 )
+    delete[] sendReq;
+    delete[] rcvReq;
+    delete[] stat;
+#endif
+}
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::swapGhostCellsXdirectionCousins( T &proc )
+{
+    real          XYZ[6];
+    morton<N>     key, sibkey;
+    Q *           point0;
+    Q *           point1;
+    bitvector<M>  nbr;
+    uint          level, siblevel;
+    int           maxSize;
+    int           count = 0;
+    morton<N + M> globalKey;
+    morton<M>     seedkey;
+    morton<M>     seednbrkey;
+    morton<N>     nbrkey;
+    uint          direction = 0;
+    uint          seedLevel, nbrseedlevel;
+    uint          topologylevel;
+    uint          mylevel, combinedlevel;
+    uint          changedirectionlevel;
+    uint          counter, nbrlevel;
+    uint          counthlevel = 0;
+
+ //   cout << "========================Topology=================== " << endl;
+
+ //   proc.printMesh();
+
+   /* cout << "============================================ " << endl;
+
+    for ( auto it = trees.begin(); it != trees.end(); it++ )
+    {
+        ( *it ).printMesh();
+
+        cout << "------------------------------------------------ " << endl;
+    }
+
+    cout << "============================================ " << endl;
+*/
+    for ( auto it = trees.begin(); it != trees.end(); it++ )
+    {
+        for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+        {
+            count++;
+        }
+    }
+  //  cout << RED << " counter =  " << RESET << count << endl;
+
+    MPI_Request *sendReq;
+    MPI_Request *rcvReq;
+    MPI_Status * stat;
+    int          offset = direction + 1;
+
+    //   count=count*2;
+
+    sendReq = new MPI_Request[count];
+    rcvReq  = new MPI_Request[count];
+    stat    = new MPI_Status[count];
+
+    uint              realLevel;
+    uint              combinedLevel;
+    int               estimatedNbrLevel;
+    int               loc, in0, in1;
+    int               flag;
+    vector<morton<N>> nbrs;
+    vector<morton<M>> nbrs0;
+    vector<Q *>       ptrs;
+    count = 0;
+    int index[4];
+    //  **********************************************************************
+    //  first loop looks for the seed that does not have any refinement in it
+    //  *********************************************************************
+    //
+    auto it3 = seeds.begin();
+#if ( 1 )
+    // loop over all the tree lists,
+
+    for ( auto it = trees.begin(); it != trees.end(); it++ )
+    {
+        //        auto it=trees.begin();
+        count = 0;
+        // retrieve the seed key
+        seedkey = ( *it3 );
+        proc.level( seedkey, &topologylevel );
+
+      //  cout << RED << " seed key " << seedkey << " seedlevel " << topologylevel << RESET << endl;
+
+        // this is for the condition that there are no trees grown in the seed
+        // loop over tree elements that has grown in each seed
+
+        for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+        {
+            //            auto it2=(*it).begin();
+
+            key = ( it2->first );
+
+            // if this element is a boundary it will not have nonlocal neighbors
+            // for siblings this is not required
+
+            point0 = it2->second;
+            ( *it ).level( key, &mylevel );
+
+            combinedlevel = mylevel + topologylevel;
+            // globalKey = 0;
+            /*
+                        cout << "================================================" << endl;
+                        cout << RED << " seedkey " << seedkey << " key " << key << " seedlevel  " << topologylevel << " keylevel " <<
+               mylevel << RESET
+                             << endl;
+            */
+            if ( extractSameGlobalLevelCousinInfo( proc, seedkey, key, topologylevel, mylevel, direction, changedirectionlevel, globalKey,
+                                                   seednbrkey, nbrkey, nbrseedlevel )
+                 == -1 )
+            {
+                continue;
+            }
+
+            //          cout << RED << " seed nbr key " << seednbrkey << " nbrkey " << nbrkey << " nbrseedlevel " << nbrseedlevel << RESET
+            //          << endl;
+
+            // cout<<" seed level "<< topologylevel<<"my level "<<mylevel<<" nbrseed level"<<endl;
+
+            estimatedNbrLevel = ( (int)mylevel + (int)topologylevel - (int)nbrseedlevel );
+            //cout << " estimated level  " << estimatedNbrLevel << endl;
+
+            /* to avoid mesh level 0, need to debug later
+             *
+                        if(estimatedNbrLevel>=0)
+                        {
+                        flag = extractRealNbrInfo( seednbrkey, nbrkey, estimatedNbrLevel, realLevel );
+                        }
+                        else
+                        {
+                          flag=2;
+                          nbrkey=0;
+                          realLevel=1;
+                        }
+
+            */
+
+            flag = extractRealNbrInfo( seednbrkey, nbrkey, estimatedNbrLevel, realLevel );
+
+            // continue if you do not own the seed, or else stack this in a list to be communicated,
+            // this is where parallel communication should occur
+
+            //cout << GREEN << " flag " << flag << endl;
+            if ( flag == -1 )
+            {
+                continue;
+            }
+
+
+           if(flag==3)
+          {
+              getPointersForNegtiveEstimateCousin( seednbrkey,nbrseedlevel, direction, nbrs0,ptrs );
+              getSortedIndex(nbrs0,index );
+              swapWithHigherLevelCousin( direction, point0, ptrs, globalKey, seednbrkey, index, combinedlevel, count, sendReq, rcvReq );
+            
+          }
+          else
+          {
+            constructTrueNbrKeysCousins( seednbrkey, nbrseedlevel, nbrkey, realLevel, direction, nbrs, flag );
+            /*
+                        cout << " true level  " << realLevel << " number of neighbors " << nbrs.size() << endl;
+                        cout << GREEN << " ??????????????? " << globalKey << RESET << endl;
+                        cout << "================================================" << endl;
+            */
+            // sibling can never have a level lower than its siblings, it is always same or greater
+
+            if ( nbrs.size() == 1 && ( combinedlevel == ( nbrseedlevel + realLevel ) ) )
+            {
+              //  cout << CYAN << nbrs.at( 0 ) << RESET << endl;
+
+                getPointers( seednbrkey, nbrs, ptrs );
+
+                //                cout << " inside " << ptrs.size() << endl;
+                point1 = ptrs.at( 0 );
+
+                 swapSameLevelCousins( direction, point0, point1, globalKey, seednbrkey, nbrs, combinedlevel, count, sendReq, rcvReq );
+            }
+#if ( 1 )
+            else if ( nbrs.size() == 1 && ( combinedlevel > ( nbrseedlevel + realLevel ) ) )
+            {
+                /* *********************************************************************************
+                      just to see if the element that has a finer mesh is detected correctly
+                */
+                /*
+                            double co=-100000.;
+
+                            S.initializeTrigonometric( point0, &co );
+                */
+                /*
+                 *************************************************************************************
+                 */
+                counthlevel++;
+                /*
+                                cout << "============= higher level =============" << endl;
+                                cout<<YELLOW<<" combined level  "<<combinedlevel<<" "<<nbrseedlevel+realLevel<<endl;
+                                cout<<" ?????????????????????????  "<<nbrs.at(0)<<RESET<<endl;
+                */
+                getPointers( seednbrkey, nbrs, ptrs );
+            
+//               ( *it ).enclosingBox( key, XYZ );           
+//                S.initializeTrigonometric( point0, XYZ );
+             
+                swapWithLowerLevelCousin( direction, point0, ptrs, globalKey, seednbrkey, nbrs, combinedlevel, count, sendReq, rcvReq );
+            }
+            else
+            {
+          /*
+                cout << "============= higher level =============" << endl;
+                cout << YELLOW << " combined level  " << combinedlevel << " " << nbrseedlevel + realLevel << endl;
+		cout<<" key "<<key<<endl;
+		cout<<" topologylevel "<<topologylevel<<endl;
+		cout<<" seednbrkey "<<seednbrkey<<endl;
+		cout<<" nbrkey "<<nbrkey<<endl;
+		cout<<" real level "<<realLevel<<" bnrseedlevel  "<<nbrseedlevel<<endl;
+                cout<< nbrs[0]<<" "<<nbrs[1]<<" "<<nbrs[2]<<" "<<nbrs[3]<<endl;
+              //  cout << " ?????????????????????????  " << nbrs.at( 0 ) << RESET << endl;
+*/
+                getPointers( seednbrkey, nbrs, ptrs );
+
+            //    ( *it ).enclosingBox( key, XYZ );           
+            //    S.initializeTrigonometric( point0, XYZ );
+                getSortedIndex(nbrs,index );
+                
+
+                swapWithHigherLevelCousin( direction, point0, ptrs, globalKey, seednbrkey, index, combinedlevel, count, sendReq, rcvReq );
+            }
+          }
+// if flag == 3 which means if estimatedLevel < 0 
+         
+
+
+
+
+
+
+
+
+
+
+#endif
+        }
+
+        MPI_Waitall( count, rcvReq, stat );
+        MPI_Waitall( count, sendReq, stat );
+
+        it3 = std::next( it3, 1 );
+        //   }
+       // cout << RED << " counter =  " << RESET << count << endl;
+    }
+#endif
+
+   // cout << RED << " counter higher level =  " << RESET << counthlevel << endl;
+#if ( 1 )
+
+    delete[] sendReq;
+    delete[] rcvReq;
+    delete[] stat;
+#endif
+}
+
+// just send point0 and point1
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::swapSameLevel( int direction, Q *point0, Q *point1, morton<N + M> globalKey,
+                                                             morton<M> seednbrkey, vector<morton<N>> &nbrs, uint combinedlevel, int &count,
+                                                             MPI_Request *sendReq, MPI_Request *rcvReq )
+{
+    //      getPointers( seednbrkey, nbrs, ptrs );
+    //     point1 = ptrs.at( 0 );
+    /*
+    bool loc = false;
+
+    if ( globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )] == false )
+    {
+       // cout << RED " inside " << N + M - 3 * ( combinedlevel - 1 ) - 1 << RESET << endl;
+       // cout << RED " inside " << globalKey[N + M - 3 * ( combinedlevel - 1 ) - 1] << RESET << endl;
+        loc = true;
+    }
+*/
+    bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
+
+    int in0, offset;
+
+    in0    = pow( -1, int( loc ) );
+    offset = VIS_DEBUG * in0;
+    in0    = pow( -1, int( loc ) ) * ( !(bool)( VIS_DEBUG ) );
+
+    if ( direction == 0 )
+    {
+        if ( (int)( loc ) * ( npx ) + offset < 0 )
+        {
+            cout << " negative index in swap same level " << endl;
+            exit( 1 );
+        }
+
+        MPI_Isend( point0 + (int)( !loc ) * (npx)-in0, 1, sendType[0], Com.myrank, count, MPI_COMM_SELF, &rcvReq[count] );
+        MPI_Irecv( point1 + (int)( loc ) * ( npx ) + offset, 1, sendType[0], Com.myrank, count, MPI_COMM_SELF, &sendReq[count] );
+       // cout << RED "?????????????????????????????? " << RESET << endl;
+    }
+
+    else if ( direction == 1 )
+    {
+        //            in0    = pow( -1, int( loc ) );
+        //            offset = VIS_DEBUG * in0;
+
+        //            cout << " offset  " << offset << endl;
+          
+        MPI_Isend( point0 + ( npx + 1 ) * ( int( !loc ) * (npy)-in0 ), 1, sendType[1], Com.myrank, count, MPI_COMM_SELF, &rcvReq[count] );
+        MPI_Irecv( point1 + ( npx + 1 ) * ( int( loc ) * ( npy ) + offset ), 1, sendType[1], Com.myrank, count, MPI_COMM_SELF,
+                   &sendReq[count] );
+    }
+    else if ( direction == 2 )
+    {
+        //  in0 = pow( -1, int( loc ) );
+        //  offset = VIS_DEBUG * in0;
+
+        MPI_Isend( point0 + ( npx + 1 ) * ( npy + 1 ) * ( int( !loc ) * (npz)-in0 ), 1, sendType[2], Com.myrank, count, MPI_COMM_SELF,
+                   &rcvReq[count] );
+        MPI_Irecv( point1 + ( npx + 1 ) * ( npy + 1 ) * ( int( loc ) * ( npz ) + offset ), 1, sendType[2], Com.myrank, count, MPI_COMM_SELF,
+                   &sendReq[count] );
+    }
+    else
+    {
+        // throw exception
+    }
+
+    count++;
+}
+
+//
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::swapSameLevelCousins( int direction, Q *point0, Q *point1, morton<N + M> globalKey,
+                                                                    morton<M> seednbrkey, vector<morton<N>> &nbrs, uint combinedlevel,
+                                                                    int &count, MPI_Request *sendReq, MPI_Request *rcvReq )
+{
+    //      getPointers( seednbrkey, nbrs, ptrs );
+    //     point1 = ptrs.at( 0 );
+   /*
+    bool loc = false;
+
+    if ( globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )] == false )
+    {
+        //cout << RED " inside " << N + M - 3 * ( combinedlevel - 1 ) - 1 << RESET << endl;
+        //cout << RED " inside " << globalKey[N + M - 3 * ( combinedlevel - 1 ) - 1] << RESET << endl;
+        loc = true;
+    }
+*/
+    bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
+    int in0, offset;
+
+    in0    = pow( -1, int( !loc ) );
+    offset = VIS_DEBUG * in0;
+    in0    = pow( -1, int( !loc ) ) * ( !(bool)( VIS_DEBUG ) );
+
+    /*
+        in0 = pow( -1, int( loc ) )*(!(bool)(VIS_DEBUG));
+         cout<<" in0  "<< in0<<" loc "<< loc  <<endl;
+          offset = VIS_DEBUG * in0;
+    */
+
+    if ( direction == 0 )
+    {
+        if ( ( !loc ) * ( npx ) + offset < 0 )
+        {
+            cout << " negative index, check function SameLevel Cousins  " << endl;
+        }
+        if ( (int)( loc ) * ( npx ) + offset < 0 )
+        {
+            cout << " negative index in swap same level " << endl;
+            exit( 1 );
+        }
+
+        MPI_Isend( point0 + (int)( loc ) * ( npx ) - in0, 1, sendType[0], Com.myrank, count, MPI_COMM_SELF, &rcvReq[count] );
+        MPI_Irecv( point1 + (int)( !loc ) * (npx)+offset, 1, sendType[0], Com.myrank, count, MPI_COMM_SELF, &sendReq[count] );
+    }
+    else if ( direction == 1 )
+    {
+        MPI_Isend( point0 + ( npx + 1 ) * ( int( loc ) * ( npy ) - in0 ), 1, sendType[1], Com.myrank, count, MPI_COMM_SELF,
+                   &rcvReq[count] );
+        MPI_Irecv( point1 + ( npx + 1 ) * ( int( !loc ) * (npy)+offset ), 1, sendType[1], Com.myrank, count, MPI_COMM_SELF,
+                   &sendReq[count] );
+    }
+    else if ( direction == 2 )
+    {
+        MPI_Isend( point0 + ( npx + 1 ) * ( npy + 1 ) * ( int( loc ) * ( npz ) - in0 ), 1, sendType[2], Com.myrank, count, MPI_COMM_SELF,
+                   &rcvReq[count] );
+        MPI_Irecv( point1 + ( npx + 1 ) * ( npy + 1 ) * ( int( !loc ) * (npz)+offset ), 1, sendType[2], Com.myrank, count, MPI_COMM_SELF,
+                   &sendReq[count] );
+    }
+    else
+    {
+        // throw exception
+    }
+
+    count++;
+}
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::swapWithHigherLevelCousin( int direction, Q *point0, vector<Q *> &ptrs,
+                                                                         morton<N + M> globalKey, morton<M> seednbrkey,
+                                                                         int *index, uint combinedlevel, int &count,
+                                                                         MPI_Request *sendReq, MPI_Request *rcvReq )
+{
+//	cout<<"swapWithHigherLevelCousin is called !!!!"<<endl;
+
+    bool locx, locy, locz;
+
+    int in0, offset;
+
+  //  cout << GREEN << globalKey << endl;
+/*
+    bool loc = false;
+    if ( globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )] == false )
+    {
+      //  cout << RED " inside " << N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 ) << RESET << endl;
+      //  cout << RED " inside " << globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )] << RESET << endl;
+        loc =true;
+    }
+*/
+    bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
+/*
+    fdeb<<" HigherLevelCousin  "<<endl;       
+    fdeb<<" globalkey  "<<globalKey<<endl;       
+    fdeb<< " loc used to determine facetag " <<loc<<endl;
+*/
+
+    Q *point1;
+    Q *pointC2F[4];
+    Q *pointChunk[4];
+
+    int npxchunk = ( npx - 1 ) / 2 + 2;
+    int npychunk = ( npy - 1 ) / 2 + 2;
+    int npzchunk = ( npz - 1 ) / 2 + 2;
+/*
+    vector<morton<N>> nbrs_old;
+    for ( int i = 0; i < nbrs.size(); i++ )
+    {
+        nbrs_old.push_back( nbrs.at( i ) );
+    }
+
+    std::sort( nbrs.begin(), nbrs.end(), compare<N> );
+
+    int index[4];
+
+    for ( int i = 0; i < nbrs.size(); i++ )
+    {
+        index[i] = 0;
+        for ( int j = 0; j < 4; j++ )
+        {
+            if ( nbrs_old.at( j ) == nbrs.at( i ) )
+            {
+                index[i] = j;
+                break;
+            }
+        }
+      //  cout << " INDICES " << index[i] << endl;
+    }
+*/
+    if ( direction == 0 )
+    {
+        for ( int i = 0; i < 4; i++ )
+        {
+            pointC2F[i]   = new Q[( npy + 1 ) * ( npz + 1 )];
+            pointChunk[i] = new Q[( npychunk * npzchunk )];
+        }
+    }
+    else if ( direction == 1 )
+    {
+        for ( int i = 0; i < 4; i++ )
+        {
+            pointC2F[i]   = new Q[( npx + 1 ) * ( npz + 1 )];
+            pointChunk[i] = new Q[( npxchunk * npzchunk )];
+        }
+    }
+    else
+    {
+        for ( int i = 0; i < 4; i++ )
+        {
+            pointC2F[i]   = new Q[( npx + 1 ) * ( npy + 1 )];
+            pointChunk[i] = new Q[( npxchunk * npychunk )];
+        }
+    }
+
+    //std::sort( nbrs.begin(), nbrs.end(), compare<N> );
+
+    // in0 = pow( -1, int( loc ) );
+    /*
+       in0 = pow( -1, int( loc ) )*(!(bool)(VIS_DEBUG));
+       offset = VIS_DEBUG * in0;
+      */
+
+   int faceTag = loc;
+ //     fdeb<<" faceTag " <<faceTag<<endl;
+
+   // loc=!loc;
+    in0    = pow( -1, int( !loc ) );
+    offset = VIS_DEBUG * in0;
+    in0    = pow( -1, int( !loc ) ) * ( !(bool)( VIS_DEBUG ) );
+
+    //     cout << CYAN <<"////////////////////////////////////////////////////////////////" << RESET << endl;
+
+    locx = globalKey[( N + M ) - 3 * ( combinedlevel - 1 ) - 1];
+    locy = globalKey[( N + M ) - 3 * ( combinedlevel - 1 ) - 2];
+    locz = globalKey[( N + M ) - 3 * ( combinedlevel - 1 ) - 3];
+
+  //  cout << " index " << N - 3 * ( combinedlevel - 1 ) - 3 << " " << globalKey[N - 3 * ( combinedlevel - 1 ) - 3] << endl;
+
+    //for ( int i = 0; i < nbrs.size(); i++ )
+      //  cout << CYAN << nbrs.at( i ) << RESET << endl;
+
+    //   Note to SHAMS
+    //   point0 has to be interpolated before submission
+    //   replace this section with your quadratic interpolation
+    //   coarseToFine (C2F)
+    //
+    //
+    //
+    //
+
+  //  fdeb<<" in0 "<<in0 <<" offset "<<offset <<endl;
+    if ( direction == 0 )
+    {
+        // Divide the surface into 4 and get the pointChunks
+        Intrp.fetchFaceChunks( point0, pxg, pyg, pzg, direction, faceTag, pointChunk );
+
+        // Interpolate pointC2F for the fine surface using this function
+        //  void interpolateFace(const Nvalue *QfaceChunk , const int nColumnChunkWGst, const int nRowChunkWGst,  Nvalue *Qinterpolated);
+        //
+
+        for ( int i = 0; i < 4; i++ )
+        {
+            Intrp.interpolateFace( pointChunk[i], npychunk, npzchunk, pointC2F[i] );
+        }
+    }
+    else if ( direction == 1 )
+    {
+        // Divide the surface into 4 and get the pointChunks
+        Intrp.fetchFaceChunks( point0, pxg, pyg, pzg, direction, faceTag, pointChunk );
+
+        // Interpolate pointC2F for the fine surface using this function
+        //  void interpolateFace(const Nvalue *QfaceChunk , const int nColumnChunkWGst, const int nRowChunkWGst,  Nvalue *Qinterpolated);
+        //
+        for ( int i = 0; i < 4; i++ )
+        {
+            Intrp.interpolateFace( pointChunk[i], npxchunk, npzchunk, pointC2F[i] );
+        }
+    }
+    else
+    {
+        // Divide the surface into 4 and get the pointChunks
+        Intrp.fetchFaceChunks( point0, pxg, pyg, pzg, direction, faceTag, pointChunk );
+
+        // Interpolate pointC2F for the fine surface using this function
+        //  void interpolateFace(const Nvalue *QfaceChunk , const int nColumnChunkWGst, const int nRowChunkWGst,  Nvalue *Qinterpolated);
+        //
+
+        for ( int i = 0; i < 4; i++ )
+        {
+            Intrp.interpolateFace( pointChunk[i], npxchunk, npychunk, pointC2F[i] );
+        }
+    }
+    for ( int i = 0; i < ptrs.size(); i++ )
+    {
+        point1 = ptrs.at( index[i] );
+
+        /*
+                cout << CYAN << " points  " << point0 << " loc " << loc << " offset " << offset << RESET << endl;
+                cout << CYAN << " sender offset  " << (int)( !loc ) * ( npx ) << RESET << endl;
+                cout << CYAN << " recvr offset  " << (int)( loc ) * ( npx ) - offset << RESET << endl;
+                cout << CYAN << " globalKey  " << globalKey <<" combinedlevel  "<<combinedlevel<<" "<<" locs "<< locy<< " "<<locz  <<RESET
+           << endl; cout << CYAN << " NbrKey  " << nbrs.at(i) <<RESET << endl;
+         */
+        if ( direction == 0 )
+        {
+            MPI_Isend( pointC2F[i], ( npy + 1 ) * ( npz + 1 ), contiguous, Com.myrank, count, MPI_COMM_SELF, &rcvReq[count] );
+            
+          //  fdeb<<" recv index direction 0 "<<  (int)( !loc ) * (npx)+offset<<endl; 
+
+            MPI_Irecv( point1 + (int)( !loc ) * (npx)+offset, 1, sendType[0], Com.myrank, count, MPI_COMM_SELF, &sendReq[count] );
+        }
+        else if ( direction == 1 )
+        {
+            MPI_Isend( pointC2F[i], ( npx + 1 ) * ( npz + 1 ), contiguous, Com.myrank, count, MPI_COMM_SELF, &rcvReq[count] );
+
+
+          // fdeb<<" recv index direction 1 ::"<<   ( npx + 1 ) * ( int( !loc ) * (npy)+offset )<<endl; 
+
+            MPI_Irecv( point1 + ( npx + 1 ) * ( int( !loc ) * (npy)+offset ), 1, sendType[1], Com.myrank, count, MPI_COMM_SELF,
+                       &sendReq[count] );
+        }
+        else
+        {
+            MPI_Isend( pointC2F[i], ( npx + 1 ) * ( npy + 1 ), contiguous, Com.myrank, count, MPI_COMM_SELF, &rcvReq[count] );
+         //  fdeb<<" recv index direction 2 "<<   ( ( npx + 1 ) * ( npy + 1 ) * int( !loc ) * (npz)+offset )<<endl; 
+            MPI_Irecv( point1 + ( ( npx + 1 ) * ( npy + 1 ) * (int( !loc ) * (npz)+offset )), 1, sendType[2], Com.myrank, count,
+                       MPI_COMM_SELF, &sendReq[count] );
+        }
+
+        count++;
+        // interpolate
+        // from higher level to lower level
+        // can not do send and recieve here due to need for extra buffer just copy over
+        //
+    }
+
+    for ( int i = 0; i < 4; i++ )
+    {
+        delete[] pointC2F[i];
+        delete[] pointChunk[i];
+    }
+   // cout << CYAN << "////////////////////////////////////////////////////////////////" << RESET << endl;
+   // cout << GREEN << "count " << count << RESET << endl;
+}
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::swapWithHigher( int direction, Q *point0, vector<Q *> &ptrs, morton<N + M> globalKey,
+                                                              morton<M> seednbrkey, int *index, uint combinedlevel, int &count,
+                                                              MPI_Request *sendReq, MPI_Request *rcvReq )
+{
+
+//	cout<<"swapWithHigher is called ***********"<<endl;
+
+    int in0, offset;
+
+/*
+    bool loc = false;
+   // cout << GREEN << " globalKey " << globalKey << endl;
+    if ( globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )] == false )
+    {
+       // cout << RED " inside " << N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 ) << RESET << endl;
+       // cout << RED " inside " << globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )] << RESET << endl;
+        loc = true;
+    }
+*/
+    bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
+
+/*
+    fdeb<<" swapHigherSibling "<<endl;       
+    fdeb<<" globalkey  "<<globalKey<<endl;       
+    fdeb<< " loc used to determine facetag " <<loc<<endl;
+*/
+    Q *point1;
+    Q *pointC2F[4];
+    Q *pointChunk[4];
+
+    int npxchunk = ( npx - 1 ) / 2 + 2;
+    int npychunk = ( npy - 1 ) / 2 + 2;
+    int npzchunk = ( npz - 1 ) / 2 + 2;
+
+    if ( direction == 0 )
+    {
+        for ( int i = 0; i < 4; i++ )
+        {
+            pointC2F[i]   = new Q[( npy + 1 ) * ( npz + 1 )];
+            pointChunk[i] = new Q[( npychunk * npzchunk )];
+        }
+    }
+    else if ( direction == 1 )
+    {
+        for ( int i = 0; i < 4; i++ )
+        {
+            pointC2F[i]   = new Q[( npx + 1 ) * ( npz + 1 )];
+            pointChunk[i] = new Q[( npxchunk * npzchunk )];
+        }
+    }
+    else
+    {
+        for ( int i = 0; i < 4; i++ )
+        {
+            pointC2F[i]   = new Q[( npx + 1 ) * ( npy + 1 )];
+            pointChunk[i] = new Q[( npxchunk * npychunk )];
+        }
+    }
+
+    int faceTag = !loc;
+ 
+    // fdeb<<" faceTag " <<faceTag<<endl;
+
+     // loc=!loc;
+        //Intrp.fetchFaceChunks( point0, pxg, pyg, pzg, direction, faceTag, pointChunk );
+
+    if ( direction == 0 )
+    {
+        // Divide the surface into 4 and get the pointChunks
+        Intrp.fetchFaceChunks( point0, pxg, pyg, pzg, direction, faceTag, pointChunk );
+
+        // Interpolate pointC2F for the fine surface using this function
+        //  void interpolateFace(const Nvalue *QfaceChunk , const int nColumnChunkWGst, const int nRowChunkWGst,  Nvalue *Qinterpolated);
+        //
+
+        for ( int i = 0; i < 4; i++ )
+        {
+            Intrp.interpolateFace( pointChunk[i], npychunk, npzchunk, pointC2F[i] );
+        }
+    }
+    else if ( direction == 1 )
+    {
+        // Divide the surface into 4 and get the pointChunks
+        Intrp.fetchFaceChunks( point0, pxg, pyg, pzg, direction, faceTag, pointChunk );
+
+        // Interpolate pointC2F for the fine surface using this function
+        //  void interpolateFace(const Nvalue *QfaceChunk , const int nColumnChunkWGst, const int nRowChunkWGst,  Nvalue *Qinterpolated);
+        //
+        for ( int i = 0; i < 4; i++ )
+        {
+            Intrp.interpolateFace( pointChunk[i], npxchunk, npzchunk, pointC2F[i] );
+        }
+    }
+    else
+    {
+        // Divide the surface into 4 and get the pointChunks
+        Intrp.fetchFaceChunks( point0, pxg, pyg, pzg, direction, faceTag, pointChunk );
+
+        // Interpolate pointC2F for the fine surface using this function
+        //  void interpolateFace(const Nvalue *QfaceChunk , const int nColumnChunkWGst, const int nRowChunkWGst,  Nvalue *Qinterpolated);
+        //
+
+        for ( int i = 0; i < 4; i++ )
+        {
+            Intrp.interpolateFace( pointChunk[i], npxchunk, npychunk, pointC2F[i] );
+        }
+    }
+
+  //  cout << "???????????????????????????????????????????????????????????????" << endl;
+/* 
+   for ( int i = 0; i < nbrs.size(); i++ )
+    {
+    //    cout << nbrs.at( i ) << " " << ptrs.at( i ) << endl;
+    }
+
+    vector<morton<N>> nbrs_old;
+
+    for ( int i = 0; i < nbrs.size(); i++ )
+    {
+        nbrs_old.push_back( nbrs.at( i ) );
+    }
+
+    std::sort( nbrs.begin(), nbrs.end(), compare<N> );
+
+
+    for ( int i = 0; i < nbrs.size(); i++ )
+    {
+        index[i] = 0;
+        for ( int j = 0; j < 4; j++ )
+        {
+            if ( nbrs_old.at( j ) == nbrs.at( i ) )
+            {
+                index[i] = j;
+                break;
+            }
+        }
+       // cout << " INDICES " << index[i] << endl;
+    }
+*/
+  //  int index[4];
+    // getSortedIndex(nbrs,index );
+    /*
+          for(int i=0;i<4;i++)
+          {
+
+          for(int j=0;j<(npy+1)*(npz+1);j++)
+           pointC2F[i][j].p=index[i];
+          }
+    // second index
+
+     //   for(int i=0;i<)
+
+    for ( int i = 0; i < nbrs.size(); i++ )
+    {
+       // cout << nbrs.at( i ) << " " << ptrs.at( index[i] ) << endl;
+        //    cout<<nbrs.at(i)<<" "<<<<ptrs.at(index[i])<<endl;
+    }
+
+    */
+   // cout << "???????????????????????????????????????????????????????????????" << endl;
+    // in0 = pow( -1, int( loc ) );
+
+    in0    = pow( -1, int( loc ) );
+    offset = VIS_DEBUG * in0;
+    in0    = pow( -1, int( loc ) ) * ( !(bool)( VIS_DEBUG ) );
+
+  //  fdeb<<" in0 "<<in0 <<" offset "<<offset <<endl;
+
+    for ( int i = 0; i < ptrs.size(); i++ )
+    {
+        point1 = ptrs.at( index[i] );
+
+      //  cout << CYAN << " point0 " << pointC2F[i] << " points  " << point1 << " loc " << loc << " nbrkey " << nbrs.at( i ) << RESET << endl;
+        //  cout << CYAN << " sender offset  " << ( npx + 1 ) * ( int( !loc ) * ( npy ) ) << RESET << endl;
+        //  cout << CYAN << " recvr offset  " << ( npx + 1 ) * ( int( !loc ) * ( npy ) + offset ) << RESET << endl;
+
+        if ( direction == 0 )
+        {
+            // do the same thing as swapWithHigherLevelCousin. interpolate and send.
+/*
+            fdeb<<" info to send "<<endl;
+            for(int l=0;l<(npz+1);l++)
+            {
+             for(int k=0;k<(npy+1);k++)
+             {
+               fdeb<<pointC2F[i][(npy+1)*l+k].p <<'\t';
+             }
+              fdeb<<endl;
+            }
+
+            fdeb<<" recv index direction 0 "<<   (int)( loc ) * ( npx ) + offset     <<endl; 
+*/
+            MPI_Isend( pointC2F[i], ( npy + 1 ) * ( npz + 1 ), contiguous, Com.myrank, count, MPI_COMM_SELF, &rcvReq[count] );
+            // MPI_Isend( point0 + (int)( !loc ) * ( npx-in0 ), 1, sendType[0], Com.myrank, count, MPI_COMM_SELF, &rcvReq[count] );
+            MPI_Irecv( point1 + (int)( loc ) * ( npx ) + offset, 1, sendType[0], Com.myrank, count, MPI_COMM_SELF, &sendReq[count] );
+        }
+        else if ( direction == 1 )
+        {
+            MPI_Isend( pointC2F[i], ( npx + 1 ) * ( npz + 1 ), contiguous, Com.myrank, count, MPI_COMM_SELF, &rcvReq[count] );
+
+            // MPI_Isend( point0 + ( npx + 1 ) * ( int( !loc ) * (npy)-in0) , 1, sendType[1], Com.myrank, count, MPI_COMM_SELF,
+            // &rcvReq[count] );
+
+            //fdeb<<" recv index direction 1 "<<  ( npx + 1 ) * ( int( loc ) * ( npy ) + offset)  <<endl; 
+            MPI_Irecv( point1 + ( npx + 1 ) * ( int( loc ) * ( npy ) + offset ), 1, sendType[1], Com.myrank, count, MPI_COMM_SELF,
+                       &sendReq[count] );
+        }
+        else if ( direction == 2 )
+        {
+            MPI_Isend( pointC2F[i], ( npx + 1 ) * ( npy + 1 ), contiguous, Com.myrank, count, MPI_COMM_SELF, &rcvReq[count] );
+            // MPI_Isend( point0 + ( npx + 1 ) * ( npy + 1 ) * ( int( !loc )*npz-in0), 1, sendType[2], Com.myrank, count, MPI_COMM_SELF,
+            // &rcvReq[count] );
+           // fdeb<<" recv index direction 2 "<<   ( npx + 1 ) * ( npy + 1 ) * ( int( loc ) * npz + offset) <<endl; 
+            MPI_Irecv( point1 + ( npx + 1 ) * ( npy + 1 ) * ( int( loc ) * npz + offset ), 1, sendType[2], Com.myrank, count, MPI_COMM_SELF,
+                       &sendReq[count] );
+        }
+
+        count++;
+    }
+
+  //fdeb<<"==================================================="<<endl;
+  //  cout << GREEN << "count " << count << " " << loc << RESET << endl;
+
+    for ( int i = 0; i < 4; i++ )
+    {
+        delete[] pointC2F[i];
+        delete[] pointChunk[i];
+    }
+   // nbrs.clear();
+}
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::swapWithHigherForNegtiveEstimate( int direction, Q *point0, vector<Q *> &ptrs, morton<N + M> globalKey,
+                                                              morton<M> seednbrkey, vector<morton<M>> &nbrs, uint combinedlevel, int &count,
+                                                              MPI_Request *sendReq, MPI_Request *rcvReq )
+{
+
+//	cout<<"swapWithHigher is called ***********"<<endl;
+
+    int in0, offset;
+
+/*
+    bool loc = false;
+   // cout << GREEN << " globalKey " << globalKey << endl;
+    if ( globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )] == false )
+    {
+       // cout << RED " inside " << N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 ) << RESET << endl;
+       // cout << RED " inside " << globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )] << RESET << endl;
+        loc = true;
+    }
+*/
+    bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
+/*
+    fdeb<<" swapHigherSibling "<<endl;       
+    fdeb<<" globalkey  "<<globalKey<<endl;       
+    fdeb<< " loc used to determine facetag " <<loc<<endl;
+*/
+    Q *point1;
+    Q *pointC2F[4];
+    Q *pointChunk[4];
+
+    int npxchunk = ( npx - 1 ) / 2 + 2;
+    int npychunk = ( npy - 1 ) / 2 + 2;
+    int npzchunk = ( npz - 1 ) / 2 + 2;
+
+    if ( direction == 0 )
+    {
+        for ( int i = 0; i < 4; i++ )
+        {
+            pointC2F[i]   = new Q[( npy + 1 ) * ( npz + 1 )];
+            pointChunk[i] = new Q[( npychunk * npzchunk )];
+        }
+    }
+    else if ( direction == 1 )
+    {
+        for ( int i = 0; i < 4; i++ )
+        {
+            pointC2F[i]   = new Q[( npx + 1 ) * ( npz + 1 )];
+            pointChunk[i] = new Q[( npxchunk * npzchunk )];
+        }
+    }
+    else
+    {
+        for ( int i = 0; i < 4; i++ )
+        {
+            pointC2F[i]   = new Q[( npx + 1 ) * ( npy + 1 )];
+            pointChunk[i] = new Q[( npxchunk * npychunk )];
+        }
+    }
+
+    int faceTag = !loc;
+ 
+     fdeb<<" faceTag " <<faceTag<<endl;
+
+     // loc=!loc;
+        //Intrp.fetchFaceChunks( point0, pxg, pyg, pzg, direction, faceTag, pointChunk );
+
+    if ( direction == 0 )
+    {
+        // Divide the surface into 4 and get the pointChunks
+        Intrp.fetchFaceChunks( point0, pxg, pyg, pzg, direction, faceTag, pointChunk );
+
+        // Interpolate pointC2F for the fine surface using this function
+        //  void interpolateFace(const Nvalue *QfaceChunk , const int nColumnChunkWGst, const int nRowChunkWGst,  Nvalue *Qinterpolated);
+        //
+
+        for ( int i = 0; i < 4; i++ )
+        {
+            Intrp.interpolateFace( pointChunk[i], npychunk, npzchunk, pointC2F[i] );
+        }
+    }
+    else if ( direction == 1 )
+    {
+        // Divide the surface into 4 and get the pointChunks
+        Intrp.fetchFaceChunks( point0, pxg, pyg, pzg, direction, faceTag, pointChunk );
+
+        // Interpolate pointC2F for the fine surface using this function
+        //  void interpolateFace(const Nvalue *QfaceChunk , const int nColumnChunkWGst, const int nRowChunkWGst,  Nvalue *Qinterpolated);
+        //
+        for ( int i = 0; i < 4; i++ )
+        {
+            Intrp.interpolateFace( pointChunk[i], npxchunk, npzchunk, pointC2F[i] );
+        }
+    }
+    else
+    {
+        // Divide the surface into 4 and get the pointChunks
+        Intrp.fetchFaceChunks( point0, pxg, pyg, pzg, direction, faceTag, pointChunk );
+
+        // Interpolate pointC2F for the fine surface using this function
+        //  void interpolateFace(const Nvalue *QfaceChunk , const int nColumnChunkWGst, const int nRowChunkWGst,  Nvalue *Qinterpolated);
+        //
+
+        for ( int i = 0; i < 4; i++ )
+        {
+            Intrp.interpolateFace( pointChunk[i], npxchunk, npychunk, pointC2F[i] );
+        }
+    }
+
+  //  cout << "???????????????????????????????????????????????????????????????" << endl;
+    for ( int i = 0; i < nbrs.size(); i++ )
+    {
+    //    cout << nbrs.at( i ) << " " << ptrs.at( i ) << endl;
+    }
+
+    vector<morton<M>> nbrs_old;
+
+    for ( int i = 0; i < nbrs.size(); i++ )
+    {
+        nbrs_old.push_back( nbrs.at( i ) );
+    }
+
+    std::sort( nbrs.begin(), nbrs.end(), compare<N> );
+
+    int index[4];
+
+    for ( int i = 0; i < nbrs.size(); i++ )
+    {
+        index[i] = 0;
+        for ( int j = 0; j < 4; j++ )
+        {
+            if ( nbrs_old.at( j ) == nbrs.at( i ) )
+            {
+                index[i] = j;
+                break;
+            }
+        }
+       // cout << " INDICES " << index[i] << endl;
+    }
+    /*
+          for(int i=0;i<4;i++)
+          {
+
+          for(int j=0;j<(npy+1)*(npz+1);j++)
+           pointC2F[i][j].p=index[i];
+          }
+    // second index
+
+     //   for(int i=0;i<)
+
+    for ( int i = 0; i < nbrs.size(); i++ )
+    {
+       // cout << nbrs.at( i ) << " " << ptrs.at( index[i] ) << endl;
+        //    cout<<nbrs.at(i)<<" "<<<<ptrs.at(index[i])<<endl;
+    }
+
+    */
+   // cout << "???????????????????????????????????????????????????????????????" << endl;
+    // in0 = pow( -1, int( loc ) );
+
+    in0    = pow( -1, int( loc ) );
+    offset = VIS_DEBUG * in0;
+    in0    = pow( -1, int( loc ) ) * ( !(bool)( VIS_DEBUG ) );
+
+   // fdeb<<" in0 "<<in0 <<" offset "<<offset <<endl;
+
+    for ( int i = 0; i < nbrs.size(); i++ )
+    {
+        point1 = ptrs.at( index[i] );
+
+      //  cout << CYAN << " point0 " << pointC2F[i] << " points  " << point1 << " loc " << loc << " nbrkey " << nbrs.at( i ) << RESET << endl;
+        //  cout << CYAN << " sender offset  " << ( npx + 1 ) * ( int( !loc ) * ( npy ) ) << RESET << endl;
+        //  cout << CYAN << " recvr offset  " << ( npx + 1 ) * ( int( !loc ) * ( npy ) + offset ) << RESET << endl;
+
+        if ( direction == 0 )
+        {
+            // do the same thing as swapWithHigherLevelCousin. interpolate and send.
+/*
+            fdeb<<" info to send "<<endl;
+            for(int l=0;l<(npz+1);l++)
+            {
+             for(int k=0;k<(npy+1);k++)
+             {
+               fdeb<<pointC2F[i][(npy+1)*l+k].p <<'\t';
+             }
+              fdeb<<endl;
+            }
+
+            fdeb<<" recv index direction 0 "<<   (int)( loc ) * ( npx ) + offset     <<endl; 
+*/
+            MPI_Isend( pointC2F[i], ( npy + 1 ) * ( npz + 1 ), contiguous, Com.myrank, count, MPI_COMM_SELF, &rcvReq[count] );
+            // MPI_Isend( point0 + (int)( !loc ) * ( npx-in0 ), 1, sendType[0], Com.myrank, count, MPI_COMM_SELF, &rcvReq[count] );
+            MPI_Irecv( point1 + (int)( loc ) * ( npx ) + offset, 1, sendType[0], Com.myrank, count, MPI_COMM_SELF, &sendReq[count] );
+        }
+        else if ( direction == 1 )
+        {
+            MPI_Isend( pointC2F[i], ( npx + 1 ) * ( npz + 1 ), contiguous, Com.myrank, count, MPI_COMM_SELF, &rcvReq[count] );
+
+            // MPI_Isend( point0 + ( npx + 1 ) * ( int( !loc ) * (npy)-in0) , 1, sendType[1], Com.myrank, count, MPI_COMM_SELF,
+            // &rcvReq[count] );
+
+ //           fdeb<<" recv index direction 1 "<<  ( npx + 1 ) * ( int( loc ) * ( npy ) + offset)  <<endl; 
+            MPI_Irecv( point1 + ( npx + 1 ) * ( int( loc ) * ( npy ) + offset ), 1, sendType[1], Com.myrank, count, MPI_COMM_SELF,
+                       &sendReq[count] );
+        }
+        else if ( direction == 2 )
+        {
+            MPI_Isend( pointC2F[i], ( npx + 1 ) * ( npy + 1 ), contiguous, Com.myrank, count, MPI_COMM_SELF, &rcvReq[count] );
+            // MPI_Isend( point0 + ( npx + 1 ) * ( npy + 1 ) * ( int( !loc )*npz-in0), 1, sendType[2], Com.myrank, count, MPI_COMM_SELF,
+            // &rcvReq[count] );
+  //          fdeb<<" recv index direction 2 "<<   ( npx + 1 ) * ( npy + 1 ) * ( int( loc ) * npz + offset) <<endl; 
+            MPI_Irecv( point1 + ( npx + 1 ) * ( npy + 1 ) * ( int( loc ) * npz + offset ), 1, sendType[2], Com.myrank, count, MPI_COMM_SELF,
+                       &sendReq[count] );
+        }
+
+        count++;
+    }
+
+//  fdeb<<"==================================================="<<endl;
+  //  cout << GREEN << "count " << count << " " << loc << RESET << endl;
+
+    for ( int i = 0; i < 4; i++ )
+    {
+        delete[] pointC2F[i];
+        delete[] pointChunk[i];
+    }
+    nbrs.clear();
+}
+
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::swapWithLowerLevelCousin( int direction, Q *point0, vector<Q *> &ptrs,
+                                                                        morton<N + M> globalKey, morton<M> seednbrkey,
+                                                                        vector<morton<N>> &nbrs, uint combinedlevel, int &count,
+                                                                        MPI_Request *sendReq, MPI_Request *rcvReq )
+{
+
+//	cout<<" swapWithLowerLevelCousin is called !!!"<<endl;
+
+    bool locy, locz, locx;
+
+    int in0, offset;
+
+    bool loc=globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
+    
+	Q *point1    	 = nullptr;
+    Q *face      	 = nullptr;
+ 	Q *innerFace 	 = nullptr;
+    Q *pointF2C  	 = nullptr;
+	Q *innerPointF2C = nullptr;
+
+    int nRowFaceWGst;
+    int nColumnFaceWGst;
+    int nRowF2C;
+    int nColumnF2C;
+
+    if ( direction == 0 )
+    {
+        nRowFaceWGst    = pzg;
+        nColumnFaceWGst = pyg;
+
+        nRowF2C    = ( nRowFaceWGst - 2 ) / 2;
+        nColumnF2C = ( nColumnFaceWGst - 2 ) / 2;
+		
+		// storage for the surface values
+        face     = new Q[nColumnFaceWGst * nRowFaceWGst];
+
+		// storage for the values below the surface
+        innerFace     = new Q[nColumnFaceWGst * nRowFaceWGst];
+
+		// storage for the values to be sent
+        pointF2C = new Q[nColumnF2C * nRowF2C];
+
+		// storage for the restricted values of the surface
+        innerPointF2C = new Q[nColumnF2C * nRowF2C];
+
+		
+    }
+    else if ( direction == 1 )
+    {
+        nRowFaceWGst    = pzg;
+        nColumnFaceWGst = pxg;
+
+        nRowF2C    = ( nRowFaceWGst - 2 ) / 2;
+        nColumnF2C = ( nColumnFaceWGst - 2 ) / 2;
+
+		// storage for the surface values
+        face     = new Q[nColumnFaceWGst * nRowFaceWGst];
+
+		// storage for the values below the surface
+        innerFace     = new Q[nColumnFaceWGst * nRowFaceWGst];
+
+		// storage for the values to be sent
+        pointF2C = new Q[nColumnF2C * nRowF2C];
+
+		// storage for the restricted values of the surface
+        innerPointF2C = new Q[nColumnF2C * nRowF2C];
+
+    }
+    else
+    {
+        nRowFaceWGst    = pyg;
+        nColumnFaceWGst = pxg;
+
+        nRowF2C    = ( nRowFaceWGst - 2 ) / 2;
+        nColumnF2C = ( nColumnFaceWGst - 2 ) / 2;
+
+		// storage for the surface values
+        face     = new Q[nColumnFaceWGst * nRowFaceWGst];
+
+		// storage for the values below the surface
+        innerFace     = new Q[nColumnFaceWGst * nRowFaceWGst];
+
+		// storage for the values to be sent
+        pointF2C = new Q[nColumnF2C * nRowF2C];
+
+		// storage for the restricted values of the surface
+        innerPointF2C = new Q[nColumnF2C * nRowF2C];
+
+
+	 }
+
+  	int faceTag = loc;
+
+    in0    = pow( -1, int( !loc ) );
+    offset = VIS_DEBUG * in0;
+    in0    = pow( -1, int( !loc ) ) * ( !(bool)( VIS_DEBUG ) );
+
+  //  cout << CYAN << "////////////////////////////////////////////////////////////////" << RESET << endl;
+
+    locx = globalKey[( N + M ) - 3 * ( combinedlevel - 1 ) - 1];
+    locy = globalKey[( N + M ) - 3 * ( combinedlevel - 1 ) - 2];
+    locz = globalKey[( N + M ) - 3 * ( combinedlevel - 1 ) - 3];
+
+	// Lagrange coefficients p0@x0=0.5; p1@x1=1.5; p2@x2=3 in lower level; P_to_send@xu=1;	
+ 	real Xif = 0.5;
+	real Xf  = 1.5;
+	real Xc  = 3.0;
+	real Xg  = 1.0;			
+	// lagrange coefficient for the layer below the surface
+	real phif = (Xg - Xf)*(Xg - Xc)/((Xif - Xf)*( Xif - Xc));
+
+	// lagrange coefficient for the surface value
+	real phf  = (Xg - Xif)*(Xg - Xc)/((Xf - Xif)*( Xf - Xc));
+	
+	/* check : old version */
+	/*
+	phf = 1.0;
+	phif = 0.0;	
+
+	*/
+   for ( int i = 0; i < nbrs.size(); i++ )
+    {
+        point1 = ptrs.at( i );
+
+
+        if ( direction == 0 )
+        {
+
+
+            // store surface and the inner surface values from point0 to face and innerFace
+            Intrp.fetchFaceF2C( point0, pxg, pyg, pzg, direction, faceTag, face,innerFace);
+
+			// restrict face to pointF2C
+            Intrp.restrictFace( face, nColumnFaceWGst, nRowFaceWGst, pointF2C );
+
+			// restrict inner face to innerPointF2C
+            Intrp.restrictFace( innerFace, nColumnFaceWGst, nRowFaceWGst, innerPointF2C );
+			
+			// interpolation before sending the ghost cells to coarse blocks
+		
+			for ( int row = 0; row < nRowF2C; row++ )
+             {
+              for ( int column = 0; column < nColumnF2C; column++ )
+                {
+				 	 // pointF2C is of type Q. multiplication operator is define as Q*number
+					 // before sending pointF2C it needs to be interpolated  	
+				
+						pointF2C[row*nColumnF2C + column] = pointF2C[row*nColumnF2C + column]*phf + innerPointF2C[row*nColumnF2C + column]*phif; 
+                
+				}
+            }
+
+
+
+
+            MPI_Isend( pointF2C, ( npy - 1 ) / 2 * ( npz - 1 ) / 2, contiguous, Com.myrank, count, MPI_COMM_SELF, &rcvReq[count] );
+
+
+            MPI_Irecv( point1 + (int)( !loc ) * ( npx ) + ( npx + 1 ) + ( npx + 1 ) * ( npy + 1 ) + locy * ( npy - 1 ) / 2 * ( npx + 1 )
+                       + locz * ( npx + 1 ) * ( npy + 1 ) * ( npz - 1 ) / 2 + offset,
+                       1, sendType[6], Com.myrank, count, MPI_COMM_SELF, &sendReq[count] );
+
+
+
+        }
+        else if ( direction == 1 )
+        {
+
+            // store surface and the inner surface values from point0 to face and innerFace
+            Intrp.fetchFaceF2C( point0, pxg, pyg, pzg, direction, faceTag, face,innerFace);
+
+			// restrict face to pointF2C
+            Intrp.restrictFace( face, nColumnFaceWGst, nRowFaceWGst, pointF2C );
+
+			// restrict inner face to innerPointF2C
+            Intrp.restrictFace( innerFace, nColumnFaceWGst, nRowFaceWGst, innerPointF2C );
+			
+			// interpolation before sending the ghost cells to coarse blocks
+		
+			for ( int row = 0; row < nRowF2C; row++ )
+             {
+              for ( int column = 0; column < nColumnF2C; column++ )
+                {
+				 	 // pointF2C is of type Q. multiplication operator is define as Q*number
+					 // before sending pointF2C it needs to be interpolated  	
+				
+						pointF2C[row*nColumnF2C + column] = pointF2C[row*nColumnF2C + column]*phf + innerPointF2C[row*nColumnF2C + column]*phif; 
+                
+				}
+            }
+
+            MPI_Isend( pointF2C, ( npx - 1 ) / 2 * ( npz - 1 ) / 2, contiguous, Com.myrank, count, MPI_COMM_SELF, &rcvReq[count] );
+            MPI_Irecv( point1 + (int)( !loc ) * ( npy + offset ) * ( npx + 1 ) + ( npx + 1 ) * ( npy + 1 ) + 1 + locx * ( npx - 1 ) / 2
+                       + locz * ( npz - 1 ) * ( npy + 1 ) * ( npx + 1 ) / 2 + (int)( loc ) * ( npx + 1 ) * (offset),
+                       1, sendType[7], Com.myrank, count, MPI_COMM_SELF, &sendReq[count] );
+
+        
+
+
+		}
+
+        else if ( direction == 2 )
+        {
+       
+             // store surface and the inner surface values from point0 to face and innerFace
+            Intrp.fetchFaceF2C( point0, pxg, pyg, pzg, direction, faceTag, face,innerFace);
+
+			// restrict face to pointF2C
+            Intrp.restrictFace( face, nColumnFaceWGst, nRowFaceWGst, pointF2C );
+
+			// restrict inner face to innerPointF2C
+            Intrp.restrictFace( innerFace, nColumnFaceWGst, nRowFaceWGst, innerPointF2C );
+			
+			// interpolation before sending the ghost cells to coarse blocks
+		
+			for ( int row = 0; row < nRowF2C; row++ )
+             {
+              for ( int column = 0; column < nColumnF2C; column++ )
+                {
+				 	 // pointF2C is of type Q. multiplication operator is define as Q*number
+					 // before sending pointF2C it needs to be interpolated  	
+				
+						pointF2C[row*nColumnF2C + column] = pointF2C[row*nColumnF2C + column]*phf + innerPointF2C[row*nColumnF2C + column]*phif; 
+                
+				}
+            }
+
+ 
+
+
+           MPI_Isend( pointF2C, ( npx - 1 ) / 2 * ( npy - 1 ) / 2, contiguous, Com.myrank, count, MPI_COMM_SELF, &rcvReq[count] );
+
+           MPI_Irecv( point1 + (int)( loc ) * ( VIS_DEBUG ) * ( npx + 1 ) * ( npy + 1 )
+                       + (int)( !loc ) * ( npz + offset ) * ( npx + 1 ) * ( npy + 1 ) + 1 + ( npx + 1 ) + locx * ( npx - 1 ) / 2
+                       + locy * ( npx + 1 ) * ( npy - 1 ) / 2,
+                       1, sendType[8], Com.myrank, count, MPI_COMM_SELF, &sendReq[count] );
+        }
+
+        count++;
+
+
+   }
+
+    delete[] pointF2C; 		pointF2C      = nullptr; // No dangling pointers
+	delete[] innerPointF2C; innerPointF2C = nullptr; // No dangling pointers
+    delete[] face;			face 		  = nullptr; // No dangling pointers
+	delete[] innerFace;		innerFace 	  = nullptr; // No dangling pointers
+
+
+// end of the member function
+}
+
+
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::flipForSibling( morton<N + M> &globalKey, uint combinedLevel, uint direction )
+{
+    globalKey.flip( ( N + M ) - 3 * ( combinedLevel - 1 ) - 1 - direction );
+}
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::commit()
+{
+    // for poisson solver this is only 2 doubles
+
+    MPI_Type_contiguous( 2, MPI_DOUBLE, &contiguous );
+    MPI_Type_commit( &contiguous );
+
+    // a) commit communication pattern for the 2:2 balance segments
+    // first argument is size, third argument is stride
+    // a.1)  In x-dir
+    MPI_Type_vector( ( npy + 1 ) * ( npz + 1 ), 1, ( npx + 1 ), contiguous, &( sendType[0] ) );
+
+    // a.2) In y-dir
+
+    // MPI_Type_vector((npx + 1)*(npz + 1), 1, (npy + 1)*(npx+1), contiguous, &(sendType[1]));
+
+    // block length this time is (npx+1) one after the other
+    // MPI_Type_vector((npz + 1),(npx + 1), (npy + 1)*(npx+1), contiguous, &(sendType[1]));
+
+    // we need (npx+1) contegous elements with the stride of "stride" and we have total of (npz+1) of them
+    //
+    MPI_Type_vector( ( npz + 1 ), ( npx + 1 ), ( npy + 1 ) * ( npx + 1 ), contiguous, &( sendType[1] ) );
+
+    // a.3)  In z-dir
+    MPI_Type_vector( ( npx + 1 ) * ( npy + 1 ), 1, 1, contiguous, &( sendType[2] ) );
+
+    MPI_Type_commit( &( sendType[0] ) );
+    MPI_Type_commit( &( sendType[1] ) );
+    MPI_Type_commit( &( sendType[2] ) );
+
+    // b)  commit communication pattern for the 1:2 balance segments
+
+    // need a send datatype and and a recursive satatype for this scenarion
+    // b.1) in Z-direction
+    MPI_Type_vector( ( npx + 1 ) / 2, ( npy + 1 ) / 2, ( npy + 1 ) / 2, contiguous, &( sendType[4] ) );
+    MPI_Type_commit( &( sendType[4] ) );
+
+    //    interpolate<Q>::test();
+
+    // c ) commit communication pattern for the 2:1 balance segments
+    // higher level sending to lower level
+    // first argument is size, third argument is stride
+    // a.1)  In x-dir
+    MPI_Type_vector( ( npy + 1 ) / 2 * ( npz + 1 ) / 2, 1, ( npx + 1 ), contiguous, &( sendType[5] ) );
+
+    MPI_Type_commit( &( sendType[5] ) );
+
+    // quadrant in yz face
+    // I am defining vector of vectors here
+
+    /*
+        MPI_Type_vector( ( npy + 1 )/2, 1, ( npx + 1 ), contiguous, &( tmpStride ) );
+        MPI_Type_commit( &( tmpStride ) );
+
+    // quadrants from front view
+        MPI_Aint lb, ub, extent;
+
+    //    MPI_Type_get_extent(tmpStride, &lb, &extent);
+    //    cout<<" extent "<<extent<<" lb "<<lb<< " " << ( npx+1 )*(npy+1)*16/extent <<endl;
+
+        MPI_Type_vector( ( npz + 1 )/2 , 1 ,(npx+1)*(npy+1)/2, tmpStride, &( sendType[6] ) );
+        MPI_Type_commit( &( sendType[6] ) );
+    */
+
+    /**************************************************************************************/
+    //
+    //                                    finer recieves, X-dir
+    //
+    //************************************************************************************/
+
+    int *blocklength  = new int[( npy - 1 ) * ( npz - 1 ) / 4];
+    int *displacement = new int[( npy - 1 ) * ( npz - 1 ) / 4];
+
+    for ( int i = 0; i < ( npy - 1 ) * ( npz - 1 ) / 4; i++ )
+    {
+        blocklength[i] = 1;
+    }
+
+    displacement[0] = 0;
+
+    for ( int j = 0; j < ( npz - 1 ) / 2; j++ )
+    {
+        for ( int i = 0; i < ( npy - 1 ) / 2; i++ )
+        {
+            displacement[j * ( npy - 1 ) / 2 + i] = i * ( npx + 1 ) + j * ( npx + 1 ) * ( npy + 1 );
+        }
+    }
+    for ( int i = 0; i < ( npy - 1 ) * ( npz - 1 ) / 4; i++ )
+    {
+        cout << " DISPLACE  " << displacement[i] << endl;
+    }
+
+    MPI_Type_indexed( ( npz - 1 ) * ( npy - 1 ) / 4, blocklength, displacement, contiguous, &( sendType[6] ) );
+    MPI_Type_commit( &( sendType[6] ) );
+
+    /**************************************************************************************/
+    MPI_Type_vector( ( npz - 1 ) / 2, ( npx - 1 ) / 2, ( npx + 1 ) * ( npy + 1 ), contiguous, &( sendType[7] ) );
+    MPI_Type_commit( &( sendType[7] ) );
+
+    MPI_Type_vector( ( npy - 1 ) / 2, ( npx - 1 ) / 2, ( npx + 1 ), contiguous, &( sendType[8] ) );
+    MPI_Type_commit( &( sendType[8] ) );
+   delete[] blocklength;
+   delete[] displacement;
+}
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::swapGhostCellsYdirectionSiblings( T &proc )
+{
+    real          XYZ[6];
+    morton<N>     key, sibkey;
+    Q *           point0;
+    Q *           point1;
+    bitvector<M>  nbr;
+    uint          level, siblevel;
+    int           maxSize;
+    int           count = 0;
+    morton<N + M> globalKey;
+    morton<M>     seedkey;
+    morton<M>     seednbrkey;
+    morton<N>     nbrkey;
+
+    //  set this for 1 for y-direction
+    uint direction = 1;
+
+    uint seedLevel, nbrseedlevel;
+    uint topologylevel;
+    uint mylevel, combinedlevel;
+    uint changedirectionlevel;
+    uint counter, nbrlevel;
+    uint counthlevel = 0;
+
+    /*
+        cout<<"========================Topology=================== "<<endl;
+
+        proc.printMesh();
+
+        cout<<"============================================ "<<endl;
+
+        for ( auto it = trees.begin(); it != trees.end(); it++ )
+        {
+            (*it).printMesh();
+
+        cout<<"------------------------------------------------ "<<endl;
+        }
+
+        cout<<"============================================ "<<endl;
+    */
+
+    for ( auto it = trees.begin(); it != trees.end(); it++ )
+    {
+        for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+        {
+            count++;
+        }
+    }
+   // cout << RED << " counter =  " << RESET << count << endl;
+
+    MPI_Request *sendReq;
+    MPI_Request *rcvReq;
+    MPI_Status * stat;
+    int          offset = direction + 1;
+
+    sendReq = new MPI_Request[count];
+    rcvReq  = new MPI_Request[count];
+    stat    = new MPI_Status[count];
+
+    uint              realLevel;
+    uint              combinedLevel;
+    int               estimatedNbrLevel;
+    int               loc, in0, in1;
+    int               flag;
+    vector<morton<N>> nbrs;
+    vector<morton<M>> nbrs0;
+    vector<Q *>       ptrs;
+    count = 0;
+    int index[4];
+    //  **********************************************************************
+    //  first loop looks for the seed that does not have any refinement in it
+    //  *********************************************************************
+    auto it3 = seeds.begin();
+#if ( 1 )
+    // loop over all the tree lists,
+    for ( auto it = trees.begin(); it != trees.end(); it++ )
+    {
+        //        auto it=trees.begin();
+        count = 0;
+        // retrieve the seed key
+        seedkey = ( *it3 );
+        proc.level( seedkey, &topologylevel );
+
+ //       cout << RED << " seed key " << seedkey << " seedlevel " << topologylevel << RESET << endl;
+
+        // this is for the condition that there are no trees grown in the seed
+        /*
+             if ( ( *it ).size() > 1 )
+                {
+                    continue;
+                }
+        */
+        // loop over tree elements that has grown in each seed
+
+        for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+        {
+            //            auto it2=(*it).begin();
+
+            key = ( it2->first );
+
+            // if this element is a boundary it will not have nonlocal neighbors
+
+            // for siblings this is not required
+            /*
+                        if ( isBoundary( proc, seedkey, key, direction ) )
+                        {
+                            continue;
+                        }
+            */
+            point0 = it2->second;
+            ( *it ).level( key, &mylevel );
+
+            combinedlevel = mylevel + topologylevel;
+            // globalKey = 0;
+/*
+            cout << "================================================" << endl;
+            cout << RED << " seedkey " << seedkey << " key " << key << " seedlevel  " << topologylevel << " keylevel " << mylevel << RESET
+                 << endl;
+*/
+            extractSameGlobalLevelSiblingInfo( proc, seedkey, key, topologylevel, mylevel, direction, globalKey, seednbrkey, nbrkey,
+                                               nbrseedlevel );
+
+            //cout << RED << " seed nbr key " << seednbrkey << " nbrkey " << nbrkey << " nbrseedlevel " << nbrseedlevel << RESET << endl;
+
+            // cout<<" seed level "<< topologylevel<<"my level "<<mylevel<<" nbrseed level"<<endl;
+
+            estimatedNbrLevel = ( (int)mylevel + (int)topologylevel - (int)nbrseedlevel );
+            //cout << " estimated level  " << estimatedNbrLevel << endl;
+
+            /* to avoid mesh level 0, need to debug later
+             *
+                        if(estimatedNbrLevel>=0)
+                        {
+                        flag = extractRealNbrInfo( seednbrkey, nbrkey, estimatedNbrLevel, realLevel );
+                        }
+                        else
+                        {
+                          flag=2;
+                          nbrkey=0;
+                          realLevel=1;
+                        }
+
+            */
+            flag = extractRealNbrInfo( seednbrkey, nbrkey, estimatedNbrLevel, realLevel );
+            // continue if you do not own the seed, or else stack this in a list to be communicated,
+            // this is where parallel communication should occur
+
+            if ( flag == -1 )
+            {
+                continue;
+            }
+
+            //cout << GREEN << " flag " << flag << endl;
+        if(flag==3)
+        {
+
+              getPointersForNegtiveEstimate( seednbrkey,nbrseedlevel, direction, nbrs0,ptrs );
+              getSortedIndex(nbrs0,index );
+              swapWithHigher( direction, point0, ptrs, globalKey, seednbrkey, index, combinedlevel, count, sendReq, rcvReq );
+             
+        } 
+       else
+       {
+            constructTrueNbrKeysSiblings( seednbrkey, nbrseedlevel, nbrkey, realLevel, direction, nbrs, flag );
+            /*
+             cout << " true level  " << realLevel << " number of neighbors " << nbrs.size() << endl;
+             cout << GREEN << " ??????????????? " << globalKey << RESET << endl;
+             cout << "================================================" << endl;
+             // sibling can never have a level lower than its siblings, it is always same or greater
+ */
+            if ( nbrs.size() == 1 )
+            {
+                getPointers( seednbrkey, nbrs, ptrs );
+             //   cout << " inside one " << ptrs.size() << endl;
+                point1 = ptrs.at( 0 );
+                swapSameLevel( direction, point0, point1, globalKey, seednbrkey, nbrs, combinedlevel, count, sendReq, rcvReq );
+            }
+#if ( 1 )
+            else
+            {
+                /*
+                            for(uint i=0;i<npx*npy*npz;i++)
+                            {
+                              point0[i]=0.0;
+                            }
+              */
+                /*
+                 * *********************************************************************************
+                              just to see if the element that has a finer mesh is detected correctly
+
+
+                              double co=-1.;
+                              S.initializeTrigonometric( point0, &co );
+                ************************************************************************************
+                */
+                counthlevel++;
+              //  cout << "============= higher level =============" << endl;
+                getPointers( seednbrkey, nbrs, ptrs );
+         
+              getSortedIndex(nbrs,index );
+
+                swapWithHigher( direction, point0, ptrs, globalKey, seednbrkey, index, combinedlevel, count, sendReq, rcvReq );
+            }
+#endif
+        }
+      }
+        MPI_Waitall( count, rcvReq, stat );
+        MPI_Waitall( count, sendReq, stat );
+
+        it3 = std::next( it3, 1 );
+        //   }
+    //    cout << RED << " counter =  " << RESET << count << endl;
+    }
+#endif
+
+    //cout << RED << " counter higher level =  " << RESET << counthlevel << endl;
+#if ( 1 )
+
+    delete[] sendReq;
+    delete[] rcvReq;
+    delete[] stat;
+#endif
+}
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::swapGhostCellsYdirectionCousins( T &proc )
+{
+    real          XYZ[6];
+    morton<N>     key, sibkey;
+    Q *           point0;
+    Q *           point1;
+    bitvector<M>  nbr;
+    uint          level, siblevel;
+    int           maxSize;
+    int           count = 0;
+    morton<N + M> globalKey;
+    morton<M>     seedkey;
+    morton<M>     seednbrkey;
+    morton<N>     nbrkey;
+    uint          direction = 1;
+    uint          seedLevel, nbrseedlevel;
+    uint          topologylevel;
+    uint          mylevel, combinedlevel;
+    uint          changedirectionlevel;
+    uint          counter, nbrlevel;
+    uint          counthlevel = 0;
+/*
+    cout << "========================Topology=================== " << endl;
+
+    proc.printMesh();
+
+    cout << "============================================ " << endl;
+
+    for ( auto it = trees.begin(); it != trees.end(); it++ )
+    {
+        ( *it ).printMesh();
+
+  //      cout << "------------------------------------------------ " << endl;
+    }
+*/
+   // cout << "============================================ " << endl;
+
+    for ( auto it = trees.begin(); it != trees.end(); it++ )
+    {
+        for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+        {
+            count++;
+        }
+    }
+   // cout << RED << " counter =  " << RESET << count << endl;
+
+    MPI_Request *sendReq;
+    MPI_Request *rcvReq;
+    MPI_Status * stat;
+    int          offset = direction + 1;
+
+    //   count=count*2;
+
+    sendReq = new MPI_Request[count];
+    rcvReq  = new MPI_Request[count];
+    stat    = new MPI_Status[count];
+
+    uint              realLevel;
+    uint              combinedLevel;
+    int               estimatedNbrLevel;
+    int               loc, in0, in1;
+    int               flag;
+    vector<morton<N>> nbrs;
+    vector<morton<M>> nbrs0;
+    vector<Q *>       ptrs;
+    count = 0;
+    int index[4];
+    //  **********************************************************************
+    //  first loop looks for the seed that does not have any refinement in it
+    //  *********************************************************************
+    auto it3 = seeds.begin();
+#if ( 1 )
+    // loop over all the tree lists,
+
+    for ( auto it = trees.begin(); it != trees.end(); it++ )
+    {
+        //        auto it=trees.begin();
+        count = 0;
+        // retrieve the seed key
+        seedkey = ( *it3 );
+        proc.level( seedkey, &topologylevel );
+
+       // cout << RED << " seed key " << seedkey << " seedlevel " << topologylevel << RESET << endl;
+
+        // this is for the condition that there are no trees grown in the seed
+        // loop over tree elements that has grown in each seed
+
+        for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+        {
+            //            auto it2=(*it).begin();
+
+            key = ( it2->first );
+
+            // if this element is a boundary it will not have nonlocal neighbors
+            // for siblings this is not required
+
+            point0 = it2->second;
+            ( *it ).level( key, &mylevel );
+
+            combinedlevel = mylevel + topologylevel;
+            // globalKey = 0;
+            /*
+                        cout << "================================================" << endl;
+                        cout << RED << " seedkey " << seedkey << " key " << key << " seedlevel  " << topologylevel << " keylevel " <<
+               mylevel << RESET
+                             << endl;
+            */
+            if ( extractSameGlobalLevelCousinInfo( proc, seedkey, key, topologylevel, mylevel, direction, changedirectionlevel, globalKey,
+                                                   seednbrkey, nbrkey, nbrseedlevel )
+                 == -1 )
+            {
+                continue;
+            }
+
+            //          cout << RED << " seed nbr key " << seednbrkey << " nbrkey " << nbrkey << " nbrseedlevel " << nbrseedlevel << RESET
+            //          << endl;
+
+            // cout<<" seed level "<< topologylevel<<"my level "<<mylevel<<" nbrseed level"<<endl;
+
+            estimatedNbrLevel =( (int)mylevel + (int)topologylevel - (int)nbrseedlevel );
+            //            cout << " estimated level  " << estimatedNbrLevel << endl;
+
+            /* to avoid mesh level 0, need to debug later
+             *
+                        if(estimatedNbrLevel>=0)
+                        {
+                        flag = extractRealNbrInfo( seednbrkey, nbrkey, estimatedNbrLevel, realLevel );
+                        }
+                        else
+                        {
+                          flag=2;
+                          nbrkey=0;
+                          realLevel=1;
+                        }
+
+            */
+
+            flag = extractRealNbrInfo( seednbrkey, nbrkey, estimatedNbrLevel, realLevel );
+
+            // continue if you do not own the seed, or else stack this in a list to be communicated,
+            // this is where parallel communication should occur
+
+            if ( flag == -1 )
+            {
+                continue;
+            }
+
+            //cout << GREEN << " flag " << flag << endl;
+        if(flag==3)
+        {
+
+              getPointersForNegtiveEstimateCousin( seednbrkey,nbrseedlevel, direction, nbrs0,ptrs );
+              getSortedIndex(nbrs0,index );
+              swapWithHigherLevelCousin( direction, point0, ptrs, globalKey, seednbrkey, index, combinedlevel, count, sendReq, rcvReq );
+             
+        } 
+       else
+       { 
+            constructTrueNbrKeysCousins( seednbrkey, nbrseedlevel, nbrkey, realLevel, direction, nbrs, flag );
+            /*
+                        cout << " true level  " << realLevel << " number of neighbors " << nbrs.size() << endl;
+                        cout << GREEN << " ??????????????? " << globalKey << RESET << endl;
+                        cout << "================================================" << endl;
+            */
+            // sibling can never have a level lower than its siblings, it is always same or greater
+
+            if ( nbrs.size() == 1 && ( combinedlevel == ( nbrseedlevel + realLevel ) ) )
+            {
+               // cout << CYAN << nbrs.at( 0 ) << RESET << endl;
+
+                getPointers( seednbrkey, nbrs, ptrs );
+
+                //                cout << " inside " << ptrs.size() << endl;
+                point1 = ptrs.at( 0 );
+
+
+            // ( *it ).enclosingBox( key, XYZ );
+           //  S.initializeTrigonometric( point0, XYZ );
+
+ 
+               swapSameLevelCousins( direction, point0, point1, globalKey, seednbrkey, nbrs, combinedlevel, count, sendReq, rcvReq );
+            }
+            else if ( nbrs.size() == 1 && ( combinedlevel > ( nbrseedlevel + realLevel ) ) )
+            {
+                /* *********************************************************************************
+                      just to see if the element that has a finer mesh is detected correctly
+                */
+                /*
+                            double co=-100000.;
+
+                            S.initializeTrigonometric( point0, &co );
+                */
+                /*
+                 *************************************************************************************
+                 */
+                counthlevel++;
+                /*
+                                cout << "============= higher level =============" << endl;
+                                cout<<YELLOW<<" combined level  "<<combinedlevel<<" "<<nbrseedlevel+realLevel<<endl;
+                                cout<<" ?????????????????????????  "<<nbrs.at(0)<<RESET<<endl;
+                */
+              getPointers( seednbrkey, nbrs, ptrs );
+           //    ( *it ).enclosingBox( key, XYZ );
+           //  S.initializeTrigonometric( point0, XYZ );
+                swapWithLowerLevelCousin( direction, point0, ptrs, globalKey, seednbrkey, nbrs, combinedlevel, count, sendReq, rcvReq );
+            }
+#if ( 1 )
+            else
+            {
+              //  cout << "============= higher level =============" << endl;
+              //  cout << YELLOW << " combined level  " << combinedlevel << " " << nbrseedlevel + realLevel << endl;
+              //  cout << " ?????????????????????????  " << nbrs.at( 0 ) << RESET << endl;
+
+                getPointers( seednbrkey, nbrs, ptrs );
+   //            ( *it ).enclosingBox( key, XYZ );
+   //             S.initializeTrigonometric( point0, XYZ );
+                getSortedIndex(nbrs,index );
+                swapWithHigherLevelCousin( direction, point0, ptrs, globalKey, seednbrkey, index, combinedlevel, count, sendReq, rcvReq );
+            }
+       }
+#endif
+        }
+
+
+       it3 = std::next( it3, 1 );
+        MPI_Waitall( count, rcvReq, stat );
+        MPI_Waitall( count, sendReq, stat );
+
+        //   }
+      //  cout << RED << " counter =  " << RESET << count << endl;
+    }
+#endif
+
+   // cout << RED << " counter higher level =  " << RESET << counthlevel << endl;
+#if ( 1 )
+
+    delete[] sendReq;
+    delete[] rcvReq;
+    delete[] stat;
+#endif
+//   nbrs.clear();
+//   nbrs.shrink_to_fit();
+}
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::swapGhostCellsZdirectionSiblings( T &proc )
+{
+    real          XYZ[6];
+    morton<N>     key, sibkey;
+    Q *           point0;
+    Q *           point1;
+    bitvector<M>  nbr;
+    uint          level, siblevel;
+    int           maxSize;
+    int           count = 0;
+    morton<N + M> globalKey;
+    morton<M>     seedkey;
+    morton<M>     seednbrkey;
+    morton<N>     nbrkey;
+
+    //  set this for 1 for y-direction
+    uint direction = 2;
+
+    uint seedLevel, nbrseedlevel;
+    uint topologylevel;
+    uint mylevel, combinedlevel;
+    uint changedirectionlevel;
+    uint counter, nbrlevel;
+    uint counthlevel = 0;
+
+    /*
+        cout<<"========================Topology=================== "<<endl;
+
+        proc.printMesh();
+
+        cout<<"============================================ "<<endl;
+
+        for ( auto it = trees.begin(); it != trees.end(); it++ )
+        {
+            (*it).printMesh();
+
+        cout<<"------------------------------------------------ "<<endl;
+        }
+
+        cout<<"============================================ "<<endl;
+    */
+
+    for ( auto it = trees.begin(); it != trees.end(); it++ )
+    {
+        for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+        {
+            count++;
+        }
+    }
+   // cout << RED << " counter =  " << RESET << count << endl;
+
+    MPI_Request *sendReq;
+    MPI_Request *rcvReq;
+    MPI_Status * stat;
+   // int          offset = direction + 1;
+
+    sendReq = new MPI_Request[count];
+    rcvReq  = new MPI_Request[count];
+    stat    = new MPI_Status[count];
+
+    uint              realLevel;
+    uint              combinedLevel;
+    int               estimatedNbrLevel;
+    int               loc, in0, in1;
+    int               flag;
+    vector<morton<N>> nbrs;
+    vector<morton<M>> nbrs0;
+    vector<Q *>       ptrs;
+    count = 0;
+    int index[4];
+    //  **********************************************************************
+    //  first loop looks for the seed that does not have any refinement in it
+    //  *********************************************************************
+    auto it3 = seeds.begin();
+#if ( 1 )
+    // loop over all the tree lists,
+    for ( auto it = trees.begin(); it != trees.end(); it++ )
+    {
+        //        auto it=trees.begin();
+        count = 0;
+        // retrieve the seed key
+        seedkey = ( *it3 );
+        proc.level( seedkey, &topologylevel );
+
+       // cout << RED << " seed key " << seedkey << " seedlevel " << topologylevel << RESET << endl;
+
+        // this is for the condition that there are no trees grown in the seed
+        /*
+             if ( ( *it ).size() > 1 )
+                {
+                    continue;
+                }
+        */
+        // loop over tree elements that has grown in each seed
+
+        for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+        {
+            //            auto it2=(*it).begin();
+
+            key = ( it2->first );
+
+            // if this element is a boundary it will not have nonlocal neighbors
+
+            // for siblings this is not required
+            /*
+                        if ( isBoundary( proc, seedkey, key, direction ) )
+                        {
+                            continue;
+                        }
+            */
+            point0 = it2->second;
+            ( *it ).level( key, &mylevel );
+
+            combinedlevel = mylevel + topologylevel;
+            // globalKey = 0;
+/*
+            cout << "================================================" << endl;
+            cout << RED << " seedkey " << seedkey << " key " << key << " seedlevel  " << topologylevel << " keylevel " << mylevel << RESET
+                 << endl;
+*/
+            extractSameGlobalLevelSiblingInfo( proc, seedkey, key, topologylevel, mylevel, direction, globalKey, seednbrkey, nbrkey,
+                                               nbrseedlevel );
+/*
+            cout << RED << " seed nbr key " << seednbrkey << " nbrkey " << nbrkey << " nbrseedlevel " << nbrseedlevel << RESET << endl;
+
+             cout<<" seed level "<< topologylevel<<"my level "<<mylevel<<" nbrseed level"<<endl;
+*/
+            estimatedNbrLevel = ( (int)mylevel + (int)topologylevel - (int)nbrseedlevel );
+//            cout << " estimated level  " << estimatedNbrLevel << endl;
+
+            /* to avoid mesh level 0, need to debug later
+             *
+                        if(estimatedNbrLevel>=0)
+                        {
+                        flag = extractRealNbrInfo( seednbrkey, nbrkey, estimatedNbrLevel, realLevel );
+                        }
+                        else
+                        {
+                          flag=2;
+                          nbrkey=0;
+                          realLevel=1;
+                        }
+
+            */
+            flag = extractRealNbrInfo( seednbrkey, nbrkey, estimatedNbrLevel, realLevel );
+            // continue if you do not own the seed, or else stack this in a list to be communicated,
+            // this is where parallel communication should occur
+
+ //           cout << GREEN << " flag " << flag << endl;
+            if ( flag == -1 )
+            {
+                continue;
+             // exit(0);
+            }
+            if(flag==3)
+            {
+   getPointersForNegtiveEstimate( seednbrkey,nbrseedlevel, direction, nbrs0,ptrs );
+              getSortedIndex(nbrs0,index );
+              swapWithHigher( direction, point0, ptrs, globalKey, seednbrkey, index, combinedlevel, count, sendReq, rcvReq );
+            
+ 
+            }
+            else
+            {
+            constructTrueNbrKeysSiblings( seednbrkey, nbrseedlevel, nbrkey, realLevel, direction, nbrs, flag );
+            /*
+             cout << " true level  " << realLevel << " number of neighbors " << nbrs.size() << endl;
+             cout << GREEN << " ??????????????? " << globalKey << RESET << endl;
+             cout << "================================================" << endl;
+             // sibling can never have a level lower than its siblings, it is always same or greater
+ 
+          
+                            for(uint i=0;i<(npx+1)*(npy+1)*(npz+1);i++)
+                            {
+                              point0[i].p=flag;
+                            }
+*/       
+#if ( 1 )
+            if ( nbrs.size() == 1 )
+            {
+                getPointers( seednbrkey, nbrs, ptrs );
+            //    cout << " inside one " << ptrs.size() << endl;
+
+                point1 = ptrs.at( 0 );
+                swapSameLevel( direction, point0, point1, globalKey, seednbrkey, nbrs, combinedlevel, count, sendReq, rcvReq );
+            }
+            else
+            {
+               /* 
+                            for(uint i=0;i<npx*npy*npz;i++)
+                            {
+                              point0[i].p=flag;
+                            }
+              
+                
+                 * *********************************************************************************
+                              just to see if the element that has a finer mesh is detected correctly
+
+
+                              double co=-1.;
+                              S.initializeTrigonometric( point0, &co );
+                ************************************************************************************
+                */
+              counthlevel++;
+        
+        /*      double co=-1.;
+                              S.initializeTrigonometric( point0, &co );
+*/
+             //   cout << "============= higher level =============" << endl;
+                getPointers( seednbrkey, nbrs, ptrs );
+
+              getSortedIndex(nbrs,index );
+                swapWithHigher( direction, point0, ptrs, globalKey, seednbrkey, index, combinedlevel, count, sendReq, rcvReq );
+            }
+         }
+#endif
+        }
+
+        MPI_Waitall( count, rcvReq, stat );
+        MPI_Waitall( count, sendReq, stat );
+
+        it3 = std::next( it3, 1 );
+        //   }
+      //  cout << RED << " counter =  " << RESET << count << endl;
+    }
+#endif
+
+  //  cout << RED << " counter higher level =  " << RESET << counthlevel << endl;
+#if ( 1 )
+
+    delete[] sendReq;
+    delete[] rcvReq;
+    delete[] stat;
+#endif
+}
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::swapGhostCellsZdirectionCousins( T &proc )
+{
+    real          XYZ[6];
+    morton<N>     key, sibkey;
+    Q *           point0;
+    Q *           point1;
+    bitvector<M>  nbr;
+    uint          level, siblevel;
+    int           maxSize;
+    int           count = 0;
+    morton<N + M> globalKey;
+    morton<M>     seedkey;
+    morton<M>     seednbrkey;
+    morton<N>     nbrkey;
+    uint          direction = 2;
+    uint          seedLevel, nbrseedlevel;
+    uint          topologylevel;
+    uint          mylevel, combinedlevel;
+    uint          changedirectionlevel;
+    uint          counter, nbrlevel;
+    uint          counthlevel = 0;
+
+/*    cout << "========================Topology=================== " << endl;
+
+    proc.printMesh();
+
+    cout << "============================================ " << endl;
+
+    for ( auto it = trees.begin(); it != trees.end(); it++ )
+    {
+        ( *it ).printMesh();
+
+        cout << "------------------------------------------------ " << endl;
+    }
+
+    cout << "============================================ " << endl;
+*/
+    for ( auto it = trees.begin(); it != trees.end(); it++ )
+    {
+        for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+        {
+            count++;
+        }
+    }
+   // cout << RED << " counter =  " << RESET << count << endl;
+
+    MPI_Request *sendReq;
+    MPI_Request *rcvReq;
+    MPI_Status * stat;
+    int          offset = direction + 1;
+
+    //   count=count*2;
+
+    sendReq = new MPI_Request[count];
+    rcvReq  = new MPI_Request[count];
+    stat    = new MPI_Status[count];
+
+    uint              realLevel;
+    uint              combinedLevel;
+    int               estimatedNbrLevel;
+    int               loc, in0, in1;
+    int               flag;
+    vector<morton<N>> nbrs;
+    vector<morton<M>> nbrs0;
+    vector<Q *>       ptrs;
+    count = 0;
+    int index[4];
+    //  **********************************************************************
+    //  first loop looks for the seed that does not have any refinement in it
+    //  *********************************************************************
+    auto it3 = seeds.begin();
+#if ( 1 )
+    // loop over all the tree lists,
+
+    for ( auto it = trees.begin(); it != trees.end(); it++ )
+    {
+        //        auto it=trees.begin();
+        count = 0;
+        // retrieve the seed key
+        seedkey = ( *it3 );
+        proc.level( seedkey, &topologylevel );
+
+        //cout << RED << " seed key " << seedkey << " seedlevel " << topologylevel << RESET << endl;
+
+        // this is for the condition that there are no trees grown in the seed
+        // loop over tree elements that has grown in each seed
+
+        for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+        {
+            //            auto it2=(*it).begin();
+
+            key = ( it2->first );
+
+            // if this element is a boundary it will not have nonlocal neighbors
+            // for siblings this is not required
+
+            point0 = it2->second;
+            ( *it ).level( key, &mylevel );
+
+            combinedlevel = mylevel + topologylevel;
+            // globalKey = 0;
+            /*
+                        cout << "================================================" << endl;
+                        cout << RED << " seedkey " << seedkey << " key " << key << " seedlevel  " << topologylevel << " keylevel " <<
+               mylevel << RESET
+                             << endl;
+            */
+            if ( extractSameGlobalLevelCousinInfo( proc, seedkey, key, topologylevel, mylevel, direction, changedirectionlevel, globalKey,
+                                                   seednbrkey, nbrkey, nbrseedlevel )
+                 == -1 )
+            {
+                continue;
+            }
+
+            //          cout << RED << " seed nbr key " << seednbrkey << " nbrkey " << nbrkey << " nbrseedlevel " << nbrseedlevel << RESET
+            //          << endl;
+
+            // cout<<" seed level "<< topologylevel<<"my level "<<mylevel<<" nbrseed level"<<endl;
+
+            estimatedNbrLevel = ( (int)mylevel + (int)topologylevel - (int)nbrseedlevel );
+            //            cout << " estimated level  " << estimatedNbrLevel << endl;
+
+            /* to avoid mesh level 0, need to debug later
+             *
+                        if(estimatedNbrLevel>=0)
+                        {
+                        flag = extractRealNbrInfo( seednbrkey, nbrkey, estimatedNbrLevel, realLevel );
+                        }
+                        else
+                        {
+                          flag=2;
+                          nbrkey=0;
+                          realLevel=1;
+                        }
+
+            */
+
+            flag = extractRealNbrInfo( seednbrkey, nbrkey, estimatedNbrLevel, realLevel );
+
+            // continue if you do not own the seed, or else stack this in a list to be communicated,
+            // this is where parallel communication should occur
+
+            if ( flag == -1 )
+            {
+                continue;
+            }
+
+           // cout << GREEN << " flag " << flag << endl;
+
+           if(flag==3)
+          {
+              getPointersForNegtiveEstimateCousin( seednbrkey,nbrseedlevel, direction, nbrs0,ptrs );
+              getSortedIndex(nbrs0,index );
+              swapWithHigherLevelCousin( direction, point0, ptrs, globalKey, seednbrkey, index, combinedlevel, count, sendReq, rcvReq );
+            
+          }
+          else
+          {
+            constructTrueNbrKeysCousins( seednbrkey, nbrseedlevel, nbrkey, realLevel, direction, nbrs, flag );
+            /*
+                        cout << " true level  " << realLevel << " number of neighbors " << nbrs.size() << endl;
+                        cout << GREEN << " ??????????????? " << globalKey << RESET << endl;
+                        cout << "================================================" << endl;
+            */
+            // sibling can never have a level lower than its siblings, it is always same or greater
+
+            if ( nbrs.size() == 1 && ( combinedlevel == ( nbrseedlevel + realLevel ) ) )
+            {
+             //   cout << CYAN << nbrs.at( 0 ) << RESET << endl;
+
+                getPointers( seednbrkey, nbrs, ptrs );
+
+                //                cout << " inside " << ptrs.size() << endl;
+                point1 = ptrs.at( 0 );
+
+                swapSameLevelCousins( direction, point0, point1, globalKey, seednbrkey, nbrs, combinedlevel, count, sendReq, rcvReq );
+            }
+#if ( 1 )
+            else if ( nbrs.size() == 1 && ( combinedlevel > ( nbrseedlevel + realLevel ) ) )
+            {
+                /* *********************************************************************************
+                      just to see if the element that has a finer mesh is detected correctly
+                */
+                /*
+                            double co=-100000.;
+
+                            S.initializeTrigonometric( point0, &co );
+                */
+                /*
+                 *************************************************************************************
+                 */
+                counthlevel++;
+                /*
+                                cout << "============= higher level =============" << endl;
+                                cout<<YELLOW<<" combined level  "<<combinedlevel<<" "<<nbrseedlevel+realLevel<<endl;
+                                cout<<" ?????????????????????????  "<<nbrs.at(0)<<RESET<<endl;
+                */
+                getPointers( seednbrkey, nbrs, ptrs );
+      //       ( *it ).enclosingBox( key, XYZ );
+      //       S.initializeTrigonometric( point0, XYZ );
+         
+                swapWithLowerLevelCousin( direction, point0, ptrs, globalKey, seednbrkey, nbrs, combinedlevel, count, sendReq, rcvReq );
+            }
+            else
+            {
+              //  cout << "============= higher level =============" << endl;
+              //  cout << YELLOW << " combined level  " << combinedlevel << " " << nbrseedlevel + realLevel << endl;
+              //  cout << " ?????????????????????????  " << nbrs.at( 0 ) << RESET << endl;
+                getPointers( seednbrkey, nbrs, ptrs );
+
+        //      ( *it ).enclosingBox( key, XYZ );
+        //     S.initializeTrigonometric( point0, XYZ );
+          
+                getSortedIndex(nbrs,index );
+                swapWithHigherLevelCousin( direction, point0, ptrs, globalKey, seednbrkey, index, combinedlevel, count, sendReq, rcvReq );
+            }
+        }
+#endif
+        }
+
+        MPI_Waitall( count, rcvReq, stat );
+        MPI_Waitall( count, sendReq, stat );
+
+        it3 = std::next( it3, 1 );
+        //   }
+      //  cout << RED << " counter =  " << RESET << count << endl;
+    }
+#endif
+
+   // cout << RED << " counter higher level =  " << RESET << counthlevel << endl;
+#if ( 1 )
+
+    delete[] sendReq;
+    delete[] rcvReq;
+    delete[] stat;
+#endif
+}
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::tagBorderElementXdirectionSiblings( T &proc )
+{
+    real          XYZ[6];
+    morton<N>     key, sibkey;
+    Q *           point0;
+    Q *           point1;
+    bitvector<M>  nbr;
+    uint          level, siblevel;
+    int           maxSize;
+    int           count = 0;
+    morton<N + M> globalKey;
+    morton<M>     seedkey;
+    morton<M>     seednbrkey;
+    morton<N>     nbrkey;
+    uint          direction = 0;
+    uint          seedLevel, nbrseedlevel;
+    uint          topologylevel;
+    uint          mylevel, combinedlevel;
+    uint          changedirectionlevel;
+    uint          counter, nbrlevel;
+    uint          counthlevel = 0;
+    int           offset      = direction + 1;
+
+    uint                  realLevel;
+    uint                  combinedLevel;
+    int                   estimatedNbrLevel;
+    int                   loc, in0, in1;
+    int                   flag;
+    vector<morton<N + M>> nbrs_comm[3];
+    vector<morton<M>>     nbrs_seed_comm[3];
+    vector<Q *>           ptrs;
+    count    = 0;
+    auto it3 = seeds.begin();
+
+    for ( int i = 0; i < 3; i++ )
+    {
+        it3 = seeds.begin();
+#if ( 1 )
+        // loop over all the tree lists,
+        for ( auto it = trees.begin(); it != trees.end(); it++ )
+        {
+            //        auto it=trees.begin();
+            count = 0;
+            // retrieve the seed key
+            seedkey = ( *it3 );
+            proc.level( seedkey, &topologylevel );
+
+            //     cout << RED << " seed key " << seedkey << " seedlevel " << topologylevel << RESET << endl;
+            // this is for the condition that there are no trees grown in the seed
+            // loop over tree elements that has grown in each seed
+
+            for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+            {
+                //            auto it2=(*it).begin();
+
+                key = ( it2->first );
+
+                // if this element is a boundary it will not have nonlocal neighbors
+
+                // for siblings this is not required
+                point0 = it2->second;
+                ( *it ).level( key, &mylevel );
+                combinedlevel = mylevel + topologylevel;
+                // globalKey = 0;
+
+                // cout << "================================================" << endl;
+                // cout << RED << " seedkey " << seedkey << " key " << key << " seedlevel  " << topologylevel << " keylevel " << mylevel <<
+                // RESET
+                //     << endl;
+
+                extractSameGlobalLevelSiblingInfo( proc, seedkey, key, topologylevel, mylevel, direction, globalKey, seednbrkey, nbrkey,
+                                                   nbrseedlevel );
+
+                // cout << RED << " seed nbr key " << seednbrkey << " nbrkey " << nbrkey << " nbrseedlevel " << nbrseedlevel << RESET <<
+                // endl;
+                // cout<<" seed level "<< topologylevel<<"my level "<<mylevel<<" nbrseed level"<<endl;
+
+                estimatedNbrLevel = ( uint )( (int)mylevel + (int)topologylevel - (int)nbrseedlevel );
+                // cout << " estimated level  " << estimatedNbrLevel << endl;
+
+                flag = extractRealNbrInfo( seednbrkey, nbrkey, estimatedNbrLevel, realLevel );
+                // continue if you do not own the seed, or else stack this in a list to be communicated,
+                // this is where parallel communication should occur
+
+                if ( flag == -1 )
+                {
+                    // add to the list of nonlocal sibling
+                    nbrs_comm[i].push_back( globalKey );
+                  //  cout << GREEN << " flag " << flag << endl;
+                }
+
+                // constructTrueNbrKeysSiblings( seednbrkey, nbrseedlevel, nbrkey, realLevel, direction, nbrs, flag );
+                // sibling can never have a level lower than its siblings, it is always same or greater
+            }
+
+            it3 = std::next( it3, 1 );
+            //   }
+            //        cout << RED << " counter =  " << RESET << count << endl;
+        }
+#endif
+    }
+
+    for ( int i = 0; i < 3; i++ )
+    {
+        it3 = seeds.begin();
+#if ( 1 )
+        // loop over all the tree lists,
+
+        for ( auto it = trees.begin(); it != trees.end(); it++ )
+        {
+            //        auto it=trees.begin();
+            count = 0;
+            // retrieve the seed key
+            seedkey = ( *it3 );
+            proc.level( seedkey, &topologylevel );
+
+           // cout << RED << " seed key " << seedkey << " seedlevel " << topologylevel << RESET << endl;
+
+            // this is for the condition that there are no trees grown in the seed
+            // loop over tree elements that has grown in each seed
+
+            for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+            {
+                //            auto it2=(*it).begin();
+
+                key = ( it2->first );
+
+                // if this element is a boundary it will not have nonlocal neighbors
+                // for siblings this is not required
+
+                point0 = it2->second;
+                ( *it ).level( key, &mylevel );
+
+                combinedlevel = mylevel + topologylevel;
+                // globalKey = 0;
+
+                if ( extractSameGlobalLevelCousinInfo( proc, seedkey, key, topologylevel, mylevel, direction, changedirectionlevel,
+                                                       globalKey, seednbrkey, nbrkey, nbrseedlevel )
+                     == -1 )
+                {
+                    continue;
+                }
+
+                //          cout << RED << " seed nbr key " << seednbrkey << " nbrkey " << nbrkey << " nbrseedlevel " << nbrseedlevel <<
+                //          RESET << endl;
+                // cout<<" seed level "<< topologylevel<<"my level "<<mylevel<<" nbrseed level"<<endl;
+
+                estimatedNbrLevel = ( uint )( (int)mylevel + (int)topologylevel - (int)nbrseedlevel );
+                //          cout << " estimated level  " << estimatedNbrLevel << endl;
+
+                flag = extractRealNbrInfo( seednbrkey, nbrkey, estimatedNbrLevel, realLevel );
+
+                // continue if you do not own the seed, or else stack this in a list to be communicated,
+                // this is where parallel communication should occur
+
+                if ( flag == -1 )
+                {
+                    continue;
+                }
+            }
+        }
+    }
+#endif
+
+    if ( Com.myrank == 1 )
+    {
+        for ( int i = 0; i < 3; i++ )
+        {
+          //  cout << RED << Com.myrank << " direction " << direction << " nbrs_comm size =  " << nbrs_comm[i].size() << RESET << endl;
+        }
+    }
+}
+
+// template class TemplateForest< TREESIZE, real, PROCSIZE, uint, Tree<PROCSIZE, uint>>;
+template class TemplateForest<TREESIZE, Q, PROCSIZE, uint, Tree<PROCSIZE, uint>>;
+// template class TemplateForest< TREESIZE, real, PROCSIZE, uint, FullTree<PROCSIZE, uint>>;
+// template class TemplateForest<  TREESIZE, real, WSIZE, uint, FullTree<WSIZE, uint>>;
+// template class TemplateForest<  TREESIZE, Q, WSIZE, uint, FullTree<WSIZE, uint>>;

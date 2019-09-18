@@ -3,8 +3,9 @@
 #include "communicate.h"
 #include "definitions.h"
 #include "tree.h"
-#include "geomSTL.h"
 #include "typedefs.h"
+#include "solver.h"
+#include "interpolate.h"
 
 /*!
  * \class TemplateForest
@@ -28,6 +29,20 @@ class TemplateForest
     uint npx;               /*!< discritization in x direction, this value for proc tree is 2, therefore forest needs its own value of npx*/
     uint npy;               /*!< discretization in y direction */
     uint npz;               /*!< discretization in z direction */
+   
+    uint px; /*!< number of cell centered elements in x-direction */
+    uint py; /*!< number of cell centered elements in y-direction */
+    uint pz; /*!< number of cell centered elements in z-direction */
+    
+    uint pxg; /*!< number of cell centered elements in x-direction plus ghost cells */
+    uint pyg; /*!< number of cell centered elements in y-direction plus ghost cells */
+    uint pzg; /*!< number of cell centered elements in z-direction plus ghost cells */
+   
+
+    MPI_Datatype sendType[9];
+    MPI_Datatype contiguous; /*!< Contiguous Data type for the {f,p} pairs */
+    MPI_Datatype tmpStride;
+
 
     private:
     MpiCom Com; /*!< Object to hold communicator data such as rank, size, etc  */
@@ -49,7 +64,10 @@ class TemplateForest
     MPI_Request *request1=nullptr;
     char   nameAppendix[80];
     unsigned long long meshSize;
-
+    solver<Nvalue> S;
+    interpolate<Nvalue>Intrp;
+ 
+    ofstream fdeb;
     /*!< Each seed will contain its own geometry points to search, this assumption implicitly coincides processor topology with geometry
     voxelization
     this way tree's root will be morton  code used in geometry voxelization and no extra operation is necessary */
@@ -67,7 +85,6 @@ class TemplateForest
     void assignSeeds( real *length,T &proc);
 //    void formProcTop(Tree<M, Mvalue> &proc ,uint proclevel,real *geom_xyz,int geom_nn);
     void assignGeom( T &proc,real *geom_xyz, uint geom_nn );
-//    void assignGeom( T &proc,GeomSTL *GM,int nSTL);
     void encodeGeometry(); /*!< encode the geometry once to the deepest level  */
     void refineEachTree( uint nlevel ); /*!<Refines every Tree in the list, nlevels, balance is satisfired for each tree but not in the global scope*/
     void moveGeom( T &proc, real *geom_xyz,uint n, real x[3]); /*!< moves the geomerty with displacements specified in x[3] in x,y and z directions */
@@ -122,9 +139,6 @@ class TemplateForest
 
     void appendToMessage( T &proc, morton<M> &seednbrkey ,morton<M+N> &combinedkey,const uint combinedlevel );
 
-    void moveGeom( T &proc, GeomSTL *GM, uint nSTL, real *x , int * activeList );
-    void assignGeom( T &proc,GeomSTL *GM, uint nSTL, real *x , int * activeList );
-
 
 #if(0)
 // derefine routines
@@ -145,17 +159,90 @@ class TemplateForest
     template <size_t N1, typename Nvalue1, size_t M1, typename Mvalue1,class T1 >
     friend class templatePhdf5;
 
-    void updateSeeds(T &proc);
-    void updateSeedsAndTrees(T &proc);
+// utilities added for poisson solver
+   void allocatePointersforEachBlock(T &proc);
+   void initializeTrigonometricForest(T &proc);
+   void swapGhostCells(T &proc);
 
-    void  resetGeom(  );
-    void updateGeom( T &proc, real *geom_xyz, uint n);
-	void updateGeom( T &proc, GeomSTL *GM, uint nSTL, real *x,  int *activeList);
-    uint getMaxSeedLevel();
-    void pushToDerefineEachTree( uint nlevel, Tree<M, uint> &proc,int nInactive , real *enClosingBoxForInactiveGeoms );
-// for debug
-//    void moveGeomDebug( T &proc, real *geom_xyz,uint n, real x[3]); /*!< moves the geomerty with displacements specified in x[3] in x,y and z directions */
-    ~TemplateForest(); /*!< Destructor of the object*/
+
+   void addToRefineLisGradBased();
+   void commit();
+   void swapGhostCellsXdirectionSiblings(T &proc );
+   void swapGhostCellsYdirectionSiblings(T &proc );
+   void swapGhostCellsZdirectionSiblings(T &proc );
+   void swapGhostCellsXdirectionCousins(T &proc );
+   void swapGhostCellsYdirectionCousins(T &proc );
+   void swapGhostCellsZdirectionCousins(T &proc );
+   void flipForSibling(morton<N+M> &globalKey,uint combinedLevel, uint direction );
+
+void extractSameGlobalLevelSiblingInfo( T &proc, const morton<M> seedkey, const morton<N > key, const uint topologylevel, const uint mylevel, const uint direction, morton<N+M> &globalKey, morton<M> &seednbrkey, morton<N> &nbrkey, uint &nbrseedlevel );
+
+int extractSameGlobalLevelCousinInfo( T &proc, const morton<M> seedkey, const morton<N > key, const uint topologylevel, uint mylevel, uint direction,uint changedirectionlevel  ,morton<N+M> &globalKey, morton<M> &seednbrkey, morton<N> &nbrkey, uint &nbrseedlevel );
+
+
+  bool isBoundary(T &proc, const morton<M> seedkey,const morton<N>key,const uint direction,const uint level);
+//void extractRealNbrInfo(  morton<M> seednbrkey,  morton<N > nbrkey,uint estimatedNbrLevel, uint &realLevel );
+int extractRealNbrInfo(  morton<M> seednbrkey, morton<N> nbrkey,const int estimatedNbrLevel, uint &realLevel );
+
+  void getPointers( morton<M> seedKey, vector<morton<N>> &nbrs , vector<Q*> &ptrs );
+
+void getPointersForNegtiveEstimate( morton<M> seednbrkey,uint nbrseedlevel,uint direction ,vector<morton<M>> &nbrs ,vector<Q *> &ptrs );
+void getPointersForNegtiveEstimateCousin( morton<M> seednbrkey,uint nbrseedlevel,uint direction ,vector<morton<M>> &nbrs ,vector<Q *> &ptrs );
+ void constructHigherLevelNbrs( morton<N+M> globalKey, uint combinedlevel, uint direction,vector<morton<N+M>>&nbrs);
+
+
+  void swapSameLevel(int direction, Q *point0, Q* point1,morton<N+M> globalkey ,  morton<M> seednbrkey, vector<morton<N>> &nbrs, uint combinedlevel,int
+&count, MPI_Request *sendReq,  MPI_Request *rcvReq);
+
+  void swapSameLevelCousins(int direction, Q *point0, Q* point1,morton<N+M> globalkey ,  morton<M> seednbrkey, vector<morton<N>> &nbrs, uint combinedlevel,int
+&count, MPI_Request *sendReq,  MPI_Request *rcvReq);
+
+
+  void swapWithHigher(int direction, Q *point0, Q* point1,morton<N+M> globalkey ,  morton<M> seednbrkey, vector<morton<N>> &nbrs, uint combinedlevel,int
+&count, MPI_Request *sendReq,  MPI_Request *rcvReq);
+
+void swapWithHigherForNegtiveEstimate( int direction, Q *point0, vector<Q *> &ptrs, morton<N + M> globalKey,
+                                                              morton<M> seednbrkey, vector<morton<M>> &nbrs, uint combinedlevel, int &count,
+                                                              MPI_Request *sendReq, MPI_Request *rcvReq );
+
+
+void swapWithHigher(int direction, Q* point0, vector<Q*> &ptrs,morton<N+M> globalKey , morton<M> seednbrkey, int *index, uint combinedlevel,int &count, MPI_Request *sendReq,  MPI_Request *rcvReq);
+
+void swapWithLowerLevelCousin( int direction, Q *point0, vector<Q *> &ptrs, morton<N + M> globalKey,
+                                                              morton<M> seednbrkey, vector<morton<N>> &nbrs, uint combinedlevel, int &count,
+                                                              MPI_Request *sendReq, MPI_Request *rcvReq );
+
+void swapWithHigherLevelCousin( int direction, Q *point0, vector<Q *> &ptrs, morton<N + M> globalKey,
+                                                              morton<M> seednbrkey, int *index, uint combinedlevel, int &count,
+                                                              MPI_Request *sendReq, MPI_Request *rcvReq );
+
+void constructTrueNbrKeysSiblings( morton<M>seednbrkey,uint topologylevel, morton<N>nbrkey,uint mylevel, uint direction, vector<morton<N>> &nbr, int flag);
+void constructTrueNbrKeysCousins( morton<M>seednbrkey,uint topologylevel, morton<N>nbrkey,uint mylevel, uint direction, vector<morton<N>> &nbr, int flag);
+void solvePoisson(T &proc,const real &Epsilon,const char *bc, const real *Dirichlet, const real *Neumann);
+void imposeBoundaryConditionXdirection( T &proc );
+void imposeBoundaryConditionYdirection( T &proc );
+void imposeBoundaryConditionZdirection( T &proc );
+void imposeBoundaryConditions( T &proc );
+
+void tagBorderElementXdirectionSiblings( T &proc );
+void initializeTrigonometricForMMS( T &proc );
+void orderAnalysis( T &proc, const real &Epsilon, const char*bc, const real* Dirichlet, const real* Neumann );
+void calcError(T &proc);
+
+void quadraticInterpTransverseDirection( T &proc );
+
+void quadInterpTransDirXdirectionSiblings(T &proc );
+void quadInterpTransDirYdirectionSiblings(T &proc );
+void quadInterpTransDirZdirectionSiblings(T &proc );
+
+void quadInterpTransDirXdirectionCousins(T &proc );
+void quadInterpTransDirYdirectionCousins(T &proc );
+void quadInterpTransDirZdirectionCousins(T &proc );
+
+
+
+~TemplateForest(); /*!< Destructor of the object*/
+
    // ~TemplateForest(){}; /*!< Destructor of the object*/
 
 };

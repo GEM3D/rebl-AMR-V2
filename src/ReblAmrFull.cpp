@@ -8,6 +8,7 @@ ReblAmrFull<N, Nvalue, M, Mvalue>::ReblAmrFull( int argcs, char *pArgs[], real *
     // corrds is the center
     //
 
+
     proclevel = atoi( pArgs[2] );
     meshlevel = atoi( pArgs[3] );
 
@@ -40,17 +41,18 @@ ReblAmrFull<N, Nvalue, M, Mvalue>::ReblAmrFull( int argcs, char *pArgs[], real *
             exit( 1 );
         }
     }
-
     MPIStartUp();
 
+/*
     GMT.construct( xyz1 );
 
-    //GMT.readSTLGeom( pArgs,1, xyz1 );
+    GMT.readSTLGeom( pArgs, xyz1 );
+
 
     Proc.construct( length, coords, nx, ny, nz );
 
     generateProcTopology();
-
+*/
     //  FullProc.construct(length,coords, nx, ny, nz);
 
     // uses distributed proc topology, without success in zoltan part this will fail
@@ -240,7 +242,7 @@ void ReblAmrFull<N, Nvalue, M, Mvalue>::writeMesh( int index )
 }
 #endif
 
-template class ReblAmrFull<TREESIZE, real, WSIZE, uint>;
+//template class ReblAmrFull<TREESIZE, real, WSIZE, uint>;
 /*
 template class ReblAmrFull<TREESIZE, real, PROCSIZE, uint, Tree<PROCSIZE, uint>>;
 template class ReblAmrFull<TREESIZE, real, WSIZE, uint, FullTree<WSIZE, uint>>;

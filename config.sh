@@ -124,44 +124,27 @@ fi
 
 if [ $cluster == "crc" ]; then
 
-#    module purge
-#    module load intel/2017.1.132
-#    module load intel-mpi/2017.1.132
-#    module load hdf5/1.10.0
-#    module load  cmake/3.7.1
-#    module load parmetis/4.0.3
- 
-#    module load zoltan/3.83.0
-#    if [ $GPU -lt 1 ]; then
+    module purge
+   # module load intel/2017.1.132
+   # module load intel-mpi/2017.1.132
+    module load  intel/2018.2.199
+    module load intel-mpi/2018.2.199
+    module load hdf5/1.10.0
+    module load  cmake/3.7.1
+    module load parmetis/4.0.3
+    module load zoltan/3.83.0
 
-#       export CC=$I_MPI_ROOT/intel64/bin/mpicc
-#        export CXX=$I_MPI_ROOT/intel64/bin/mpiicpc
-#        export GPU1=0;
-#        export MPI_ROOT=$I_MPI_ROOT/intel64;
-#    else
-#        echo "No GPU is not coded yet for CRC"
-#    fi
 
-     module purge
-     module load intel/2018.2.199
-     module load intel-mpi/2018.2.199
-     module load gcc/6.3.0
-     module load hdf5/1.10.0
-     module load  cmake/3.7.1
-     module load parmetis/4.0.3
-     module load zoltan/3.83.0
 
-     if [ $GPU -lt 1 ]; then
+    if [ $GPU -lt 1 ]; then
 
         export CC=$I_MPI_ROOT/intel64/bin/mpicc
         export CXX=$I_MPI_ROOT/intel64/bin/mpiicpc
         export GPU1=0;
         export MPI_ROOT=$I_MPI_ROOT/intel64;
-
     else
         echo "No GPU is not coded yet for CRC"
     fi
-
 
 fi
 

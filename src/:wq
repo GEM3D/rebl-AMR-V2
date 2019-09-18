@@ -374,26 +374,12 @@ void ReblAmr<N, Nvalue, M, Mvalue>::tagElemGradBased(  )
   Forest.addToRefineLisGradBased();
 
 }
-
-
 template <size_t N, typename Nvalue, size_t M, typename Mvalue>
-void ReblAmr<N, Nvalue, M, Mvalue>::solvePoisson(const real &Epsilon, const char*bc, const real* Dirichlet, const real* Neumann)      
+void ReblAmr<N, Nvalue, M, Mvalue>::solvePoisson()      
 {
-Forest.solvePoisson(Proc,Epsilon,bc,Dirichlet,Neumann);
+Forest.solvePoisson(Proc);
 
 }
-
-
-template <size_t N, typename Nvalue, size_t M, typename Mvalue>
-void ReblAmr<N, Nvalue, M, Mvalue>::orderAnalysis(const real &Epsilon, const char*bc, const real* Dirichlet, const real* Neumann)      
-{
-Forest.orderAnalysis(Proc,Epsilon,bc,Dirichlet,Neumann);
-
-}
-
-
-
-
 
 #endif
 

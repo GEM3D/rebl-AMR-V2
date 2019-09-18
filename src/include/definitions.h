@@ -118,8 +118,74 @@ std::string FormatWithCommas(T value)
 }
 
 
+typedef struct sv
+{
+real f; /*!< source terms for the poisson equation*/
+real p; /*!< cell-centered pressure values */  
+
+sv& operator=(const sv& a)
+{
+    f = a.f;
+    p = a.p;
+
+    return *this;
+}
+
+sv& operator*(const double &number)
+{
+		f = f*number;
+		p = p*number;
+	return *this;		
+}
+
+sv& operator+(const sv& a)
+{
+		f = f+a.f;
+		p = p+a.p;
+
+	return *this;		
+}
 
 
+
+
+} Q;
+ 
+template<size_t N>
+bool compare(morton<N> a, morton<N> b) 
+{ 
+    return (a.to_ulong() < b.to_ulong()); 
+} 
+
+
+
+template<size_t N>
+void getSortedIndex(vector<morton<N>> &nbrs,int *index )
+{
+ vector<morton<N>> nbrs_old;
+
+    for ( int i = 0; i < nbrs.size(); i++ )
+    {
+        nbrs_old.push_back( nbrs.at( i ) );
+    }
+
+    std::sort( nbrs.begin(), nbrs.end(), compare<N> );
+
+    for ( int i = 0; i < nbrs.size(); i++ )
+    {
+        index[i] = 0;
+        for ( int j = 0; j < 4; j++ )
+        {
+            if ( nbrs_old.at( j ) == nbrs.at( i ) )
+            {
+                index[i] = j;
+                break;
+            }
+        }
+       // cout << " INDICES " << index[i] << endl;
+       //     }
+ }
+}
 
 #define RED "\033[01;31m"
 #define GREEN "\033[22;32m"

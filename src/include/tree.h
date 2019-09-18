@@ -114,35 +114,38 @@ class Tree
     void flipRefineElemTag( typename std::unordered_map<morton<N>, int>::iterator it );
     void refinelistReset();
     void constructNonlocalHigherLevelNbrs( const morton<N> &key, const uint &keylevel, const uint &direction, morton<N> *nbr );
+//    void constructNonlocalHigherLevelNbrs( const morton<N> &key, const uint &keylevel, const uint &direction, vector<morton<N>> &nbr );
+
     void insertSeed( morton<N> &key );
 
     void insertNbrs( vector<int> &Nbrs );
     void enclosingBoxFixedLevel( morton<N> key, uint mylevel, real *X );
     void centroidFixedLevel( morton<N> key, const uint mylevel, real *xyz );
 
+    void deallocatePointers( );
+    void initializeValue( value v);
     virtual void convertCoordToMorton( real *xyz, morton<N> &key ); /*!<converts coordinates of a point to morton code */
-    typename std::unordered_map<morton<N>, int>::iterator  findInList( morton<N> key );                                                        
-
-    void setToZero(  );
-    void ignoreInactive(morton<N> key );
-    void ignoreInactive(int nInactive, real * box);
-	void ignoreInactiveVertices(int nInactive, real * box);
-
-     void  getCoords( real *X );
-
-     bool operator==(const  Tree<N, value>  & T0) const;  
-
-//    void derefineDerefineList();
-/*
-
-       template <size_t N1, typename Nvalue1, size_t N2>
-       friend void convertCoordToMorton(Tree<N1,Nvalue1> T, real *xyz, morton<N2> &key );
+    typename std::unordered_map<morton<N>, int>::iterator  findInList( morton<N> key );                                                         /*
+    template <size_t N1, typename Nvalue1, size_t N2>
+    friend void convertCoordToMorton(Tree<N1,Nvalue1> T, real *xyz, morton<N2> &key );
     */
 
     /*
       template <size_t N1, typename Nvalue1, size_t M1, typename Mvalue1>
       friend class Phdf5;
   */
+// addind for poisson solver 
+
+    void allocatePointers();
+  
+    void pushToRefinelist( morton<N> &key ); 
+
+    bool getSibling( morton<N> key, uint mylevel, uint dirrection, morton<N> &sibkey); /*!< given the direction it gives you the coordiate of the sibling and also the location of the face
+      it returns zero if the element is to the east and 1 if it is to the west  */
+// note that no need for deallocation as object clean 
+   void  constructHigherLevelNbrs( const morton<N> &key, const uint &keylevel,int signBit, const uint &direction, vector<morton<N>> &nbr );
+ void constructNonlocalHigherLevelNbrs( const morton<N> &key, const uint &keylevel,int signBit, const uint &direction, vector<morton<N>> &nbr );
+
 
     ~Tree(); /*!< Destructor of the class, it frees the memeory pointed by pointer in the hashmap value  if allocated*/
 };
@@ -226,6 +229,13 @@ class FullTree : public Tree<N, value>
     ~FullTree() {}; /*!< Destructor of this class*/
     // add erase because regular refine does not free the memory, though I reallocate in the next step, normally it should not leak
     // void  erase(morton key); /* rather specialized version of erase, since the memory has to be freed as well*/
+    //
+
+    // utilities added to extract neighbor data for communication
+    
+ 
+
+
 };
 #endif
 
