@@ -307,6 +307,119 @@ void interpolate<Nvalue>::getInterpolantNodes( const Nvalue *soln, const int nro
 
 
 template <typename Nvalue>
+void interpolate<Nvalue>::updateSndBufferPreSwap(Nvalue *point0, const int pxg, const int pyg, const int pzg, const int direction,const int faceTag,Nvalue*pointF2C) 
+{
+// this function does the transverse interpolation on the send buffer (pre-swap interpolation) when data exchanged from fine block to coarse one
+
+
+    Q *face          = nullptr;
+    Q *innerFace     = nullptr;
+    Q *innerPointF2C = nullptr;	
+	
+	int nRowFaceWGst;
+    int nColumnFaceWGst;
+    int nRowF2C;
+    int nColumnF2C;
+
+    if ( direction == 0 )
+    {
+        nRowFaceWGst    = pzg;
+        nColumnFaceWGst = pyg;
+
+        nRowF2C    = ( nRowFaceWGst - 2 ) / 2;
+        nColumnF2C = ( nColumnFaceWGst - 2 ) / 2;
+              
+        // storage for the surface values
+        face     = new Q[nColumnFaceWGst * nRowFaceWGst];
+
+        // storage for the values below the surface
+        innerFace     = new Q[nColumnFaceWGst * nRowFaceWGst];
+
+        // storage for the restricted values of the surface
+        innerPointF2C = new Q[nColumnF2C * nRowF2C];
+
+              
+    }
+ else if ( direction == 1 )
+    {
+        nRowFaceWGst    = pzg;
+        nColumnFaceWGst = pxg;
+
+        nRowF2C    = ( nRowFaceWGst - 2 ) / 2;
+        nColumnF2C = ( nColumnFaceWGst - 2 ) / 2;
+
+        // storage for the surface values
+        face     = new Q[nColumnFaceWGst * nRowFaceWGst];
+
+        // storage for the values below the surface
+        innerFace     = new Q[nColumnFaceWGst * nRowFaceWGst];
+
+        // storage for the restricted values of the surface
+        innerPointF2C = new Q[nColumnF2C * nRowF2C];
+
+    }
+  else
+    {
+        nRowFaceWGst    = pyg;
+        nColumnFaceWGst = pxg;
+
+        nRowF2C    = ( nRowFaceWGst - 2 ) / 2;
+        nColumnF2C = ( nColumnFaceWGst - 2 ) / 2;
+
+        // storage for the surface values
+        face     = new Q[nColumnFaceWGst * nRowFaceWGst];
+
+        // storage for the values below the surface
+        innerFace     = new Q[nColumnFaceWGst * nRowFaceWGst];
+
+        // storage for the restricted values of the surface
+        innerPointF2C = new Q[nColumnF2C * nRowF2C];
+
+
+     }
+
+	real  Xg = 1.0; /*!<coordinate where the ghost needs to be calculated */
+    real  X1 = 0.5; /*!<coordinate of the first point in fine block*/
+    real  X2 = 1.5; /*!<coordinate of the second point infine block*/
+    real  X3 = 3.0; /*!<coordinate of the third point inside the coarse block*/
+
+    real  L1  = (Xg - X2)*(Xg - X3)/((X1 - X2)*( X1 - X3));
+    real  L2  = (Xg - X1)*(Xg - X3)/((X2 - X1)*( X2 - X3));
+    real  L3  = (Xg - X1)*(Xg - X2)/((X3 - X1)*( X3 - X2));
+
+
+	// store surface and the inner surface values from point0 to face and innerFace
+    fetchFaceF2C( point0, pxg, pyg, pzg, direction, faceTag, face,innerFace);
+
+    // restrict face to pointF2C
+    restrictFace( face, nColumnFaceWGst, nRowFaceWGst, pointF2C );
+
+    // restrict inner face to innerPointF2C
+    restrictFace( innerFace, nColumnFaceWGst, nRowFaceWGst, innerPointF2C );
+            
+    // interpolation before sending the ghost cells to coarse blocks
+        
+    for ( int row = 0; row < nRowF2C; row++ )
+     {
+       for ( int column = 0; column < nColumnF2C; column++ )
+          {
+            // pointF2C is of type Q. multiplication operator is define as Q*number                                                                                                                  
+            // before sending pointF2C it needs to be interpolated     
+             
+			pointF2C[row*nColumnF2C + column] = pointF2C[row*nColumnF2C + column]*L2 + innerPointF2C[row*nColumnF2C + column]*L1; 
+                
+          }
+     }
+
+
+
+ delete[] innerPointF2C; innerPointF2C = nullptr; // No dangling pointers
+ delete[] face;          face          = nullptr; // No dangling pointers
+ delete[] innerFace;     innerFace     = nullptr; // No dangling pointers 
+
+}
+
+template <typename Nvalue>
 void interpolate<Nvalue>::updateRcvdGhstValWithnFineBlock(Nvalue *point0, const int pxg, const int pyg, const int pzg, const int direction,const int faceTag)
 {
 	/*!< This function interpolates the Ghost value in fine blocks after receiving the Ghost value from the coarse blocks 
@@ -323,7 +436,6 @@ real  L1  = (Xg - X2)*(Xg - X3)/((X1 - X2)*( X1 - X3));
 real  L2  = (Xg - X1)*(Xg - X3)/((X2 - X1)*( X2 - X3));
 real  L3  = (Xg - X1)*(Xg - X2)/((X3 - X1)*( X3 - X2));
 
-// q@xu = 
 
 // x direction 
     if ( direction == 0 )
@@ -1273,179 +1385,6 @@ void interpolate<Nvalue>::fetchFaceChunks( const Nvalue *point0, const int pxg, 
     }
 }
 
-/* this function uses 3 point to construct a quadratic polynomial*/
-template <typename Nvalue>
-void interpolate<Nvalue>::quadraticOneD( Nvalue *point, const int indexGhost, const int index1, const int index2 )
-{
-    /* f(x) = a0 + a1*x + a2*x*x */
-    /* f1(0 = QGhost, f2 = Q1, f3 = Q2 */
-    /* we use lagrange's formula here
-     * p2(x) = y0*L0(x) + y1*L1(x) + y2*L2(x);
-     * X0 = 1;
-     * X1 = 2.5;
-     * X2 = 3.5;
-     * Xu = 1.5; Location of the Ghost cell in fine block*/
 
-    real X0 = 1.0;
-    real X1 = 2.5;
-    real X2 = 3.5;
-    real Xu = 1.5;
-
-    real L0 = ( Xu - X1 ) * ( Xu - X2 ) / ( ( X0 - X1 ) * ( X0 - X2 ) );
-
-    real L1 = ( Xu - X0 ) * ( Xu - X2 ) / ( ( X1 - X0 ) * ( X1 - X2 ) );
-
-    real L2 = ( Xu - X0 ) * ( Xu - X1 ) / ( ( X2 - X0 ) * ( X2 - X1 ) );
-
-    // Later on (*) operator should be overloaded so that multiplication for other types happen automatically
-    // Nvalue which is the solution vector contains other variables( u, v , w) and we don't want to write a sepparate line for each
-    point[indexGhost].p = point[indexGhost].p * L0 + point[index1].p * L1 + point[index1].p * L2;
-
-    cout << " QGhost is updated " << endl;
-}
-
-// interpolateGhostCells is a function that uses 3 points in the normal direction to the face of a block to
-// create a quadratic function which can be used to find the right value for the guard(Ghost) cells.
-// Because values send by the coarser blocks are all with double meshsizes (e.g. 2*dx, 2*dy, 2*dz)  wherease values in the finer blocks
-// are half of the coarse blocks' mesh sizes (e.ge dx, dy, dz) . Therefore one needs to interpolate those values to find a new
-// that matches the mesh size.
-//
-template <typename Nvalue>
-void interpolate<Nvalue>::interpolateGhostCells( Nvalue *point, const int pxg, const int pyg, const int pzg, const int direction )
-{
-    // (0,0)Ghost Vale <-2dx-> node1 <- 3dx -> node2
-    // Ghost Value(@dx) = function(Ghost Value, node1, node2);
-
-    /* for face i = 0 */
-
-    real X0 = 1.0;
-    real X1 = 2.5;
-    real X2 = 3.5;
-    real Xu = 1.5;
-
-    real L0 = ( Xu - X1 ) * ( Xu - X2 ) / ( ( X0 - X1 ) * ( X0 - X2 ) );
-
-    real L1 = ( Xu - X0 ) * ( Xu - X2 ) / ( ( X1 - X0 ) * ( X1 - X2 ) );
-
-    real L2 = ( Xu - X0 ) * ( Xu - X1 ) / ( ( X2 - X0 ) * ( X2 - X1 ) );
-
-    // Later on (*) operator should be overloaded so that multiplication for other types happen automatically
-    // // Nvalue which is the solution vector contains other variables( u, v , w) and we don't want to write a sepparate line for each
-    // point[indexGhost].p = point[indexGhost].p*L0 + point[index1].p*L1 + point[index1].p*L2;
-
-    switch ( direction )
-    {
-        // x direction
-        case 0:
-
-            for ( int k = 1; k < pzg - 1; k++ )
-            {
-                for ( int j = 1; j < pyg - 1; j++ )
-                {
-                    // we need i = 0 , i = 1, i = 2;
-
-                    int indexGhost = pxg * pyg * k + pxg * j + 0;
-                    int index1     = pxg * pyg * k + pxg * j + 1;
-                    int index2     = pxg * pyg * k + pxg * j + 2;
-
-                    // updates the point[indexGhost];
-                    // quadraticOneD(point, indexGhost,index1,index2); instead of calling the function, do it here.
-                    point[indexGhost] = point[indexGhost] * L0 + point[index1] * L1 + point[index2] * L2;
-                }
-            }
-
-            /* for face i = pgx-1 */
-
-            for ( int k = 1; k < pzg - 1; k++ )
-            {
-                for ( int j = 1; j < pyg - 1; j++ )
-                {
-                    // we need i = pxg-1, i = pxg-2, i = pxg-3;
-
-                    int indexGhost = pxg * pyg * k + pxg * j + pxg - 1;
-                    int index1     = pxg * pyg * k + pxg * j + pxg - 2;
-                    int index2     = pxg * pyg * k + pxg * j + pxg - 3;
-
-                    point[indexGhost] = point[indexGhost] * L0 + point[index1] * L1 + point[index2] * L2;
-                }
-            }
-
-            break;
-
-        // y direction
-        case 1:
-
-            /* for face j = 0 */
-
-            for ( int k = 1; k < pzg - 1; k++ )
-            {
-                for ( int i = 1; i < pxg - 1; i++ )
-                {
-                    // we need j = 0, i = 1, i = 2;
-
-                    int indexGhost = pxg * pyg * k + pxg * 0 + i;
-                    int index1     = pxg * pyg * k + pxg * 1 + i;
-                    int index2     = pxg * pyg * k + pxg * 2 + i;
-
-                    point[indexGhost] = point[indexGhost] * L0 + point[index1] * L1 + point[index2] * L2;
-                }
-            }
-
-            /* for face j = pyg-1 */
-
-            for ( int k = 1; k < pzg - 1; k++ )
-            {
-                for ( int i = 1; i < pxg - 1; i++ )
-                {
-                    // we need j = pyg-1, i = pyg-2, i = pyg-3;
-
-                    int indexGhost = pxg * pyg * k + pxg * ( pyg - 1 ) + i;
-                    int index1     = pxg * pyg * k + pxg * ( pyg - 2 ) + i;
-                    int index2     = pxg * pyg * k + pxg * ( pyg - 3 ) + i;
-
-                    point[indexGhost] = point[indexGhost] * L0 + point[index1] * L1 + point[index2] * L2;
-                }
-            }
-
-            break;
-
-        // z direction
-        case 2:
-
-            /* for face k = 0 */
-
-            for ( int j = 1; j < pyg - 1; j++ )
-            {
-                for ( int i = 1; i < pxg - 1; i++ )
-                {
-                    // we need k = 0, k = 1, k = 2;
-
-                    int indexGhost = pxg * pyg * 0 + pxg * j + i;
-                    int index1     = pxg * pyg * 1 + pxg * j + i;
-                    int index2     = pxg * pyg * 2 + pxg * j + i;
-
-                    point[indexGhost] = point[indexGhost] * L0 + point[index1] * L1 + point[index2] * L2;
-                }
-            }
-
-            /* for face k = pzg -1 */
-
-            for ( int j = 1; j < pyg - 1; j++ )
-            {
-                for ( int i = 1; i < pxg - 1; i++ )
-                {
-                    // we need k = pzg-1, k = pzg-2, k = pzg-3;
-
-                    int indexGhost = pxg * pyg * ( pzg - 1 ) + pxg * j + i;
-                    int index1     = pxg * pyg * ( pzg - 2 ) + pxg * j + i;
-                    int index2     = pxg * pyg * ( pzg - 3 ) + pxg * j + i;
-
-                    point[indexGhost] = point[indexGhost] * L0 + point[index1] * L1 + point[index2] * L2;
-                }
-            }
-
-            break;
-    }
-}
 
 template class interpolate<Q>;

@@ -219,6 +219,7 @@ void swapWithHigherLevelCousin( int direction, Q *point0, vector<Q *> &ptrs, mor
 void constructTrueNbrKeysSiblings( morton<M>seednbrkey,uint topologylevel, morton<N>nbrkey,uint mylevel, uint direction, vector<morton<N>> &nbr, int flag);
 void constructTrueNbrKeysCousins( morton<M>seednbrkey,uint topologylevel, morton<N>nbrkey,uint mylevel, uint direction, vector<morton<N>> &nbr, int flag);
 void solvePoisson(T &proc,const real &Epsilon,const char *bc, const real *Dirichlet, const real *Neumann);
+
 void imposeBoundaryConditionXdirection( T &proc );
 void imposeBoundaryConditionYdirection( T &proc );
 void imposeBoundaryConditionZdirection( T &proc );

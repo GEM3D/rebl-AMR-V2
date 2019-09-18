@@ -61,6 +61,10 @@ void updateRcvdGhstValWithnCoarseBlock(Nvalue *point0, const int pxg, const int 
 void updateRcvdGhstValWithnFineBlock(Nvalue *point0, const int pxg, const int pyg, const int pzg, const int direction,const int faceTag);
 
 
+//this function does the transverse interpolation on the send buffer (pre-swap interpolation) when data exchanged from fine block to coarse one 
+void updateSndBufferPreSwap(Nvalue *point0, const int pxg, const int pyg, const int pzg, const int direction,const int faceTag,Nvalue*pointF2C);
+
+
 };
 
 

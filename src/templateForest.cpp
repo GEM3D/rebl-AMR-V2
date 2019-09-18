@@ -11239,10 +11239,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::swapWithLowerLevelCousin( int dire
     bool loc=globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
     
 	Q *point1    	 = nullptr;
-    Q *face      	 = nullptr;
- 	Q *innerFace 	 = nullptr;
     Q *pointF2C  	 = nullptr;
-	Q *innerPointF2C = nullptr;
 
     int nRowFaceWGst;
     int nColumnFaceWGst;
@@ -11257,18 +11254,8 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::swapWithLowerLevelCousin( int dire
         nRowF2C    = ( nRowFaceWGst - 2 ) / 2;
         nColumnF2C = ( nColumnFaceWGst - 2 ) / 2;
 		
-		// storage for the surface values
-        face     = new Q[nColumnFaceWGst * nRowFaceWGst];
-
-		// storage for the values below the surface
-        innerFace     = new Q[nColumnFaceWGst * nRowFaceWGst];
-
 		// storage for the values to be sent
         pointF2C = new Q[nColumnF2C * nRowF2C];
-
-		// storage for the restricted values of the surface
-        innerPointF2C = new Q[nColumnF2C * nRowF2C];
-
 		
     }
     else if ( direction == 1 )
@@ -11279,18 +11266,8 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::swapWithLowerLevelCousin( int dire
         nRowF2C    = ( nRowFaceWGst - 2 ) / 2;
         nColumnF2C = ( nColumnFaceWGst - 2 ) / 2;
 
-		// storage for the surface values
-        face     = new Q[nColumnFaceWGst * nRowFaceWGst];
-
-		// storage for the values below the surface
-        innerFace     = new Q[nColumnFaceWGst * nRowFaceWGst];
-
 		// storage for the values to be sent
         pointF2C = new Q[nColumnF2C * nRowF2C];
-
-		// storage for the restricted values of the surface
-        innerPointF2C = new Q[nColumnF2C * nRowF2C];
-
     }
     else
     {
@@ -11300,18 +11277,8 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::swapWithLowerLevelCousin( int dire
         nRowF2C    = ( nRowFaceWGst - 2 ) / 2;
         nColumnF2C = ( nColumnFaceWGst - 2 ) / 2;
 
-		// storage for the surface values
-        face     = new Q[nColumnFaceWGst * nRowFaceWGst];
-
-		// storage for the values below the surface
-        innerFace     = new Q[nColumnFaceWGst * nRowFaceWGst];
-
 		// storage for the values to be sent
         pointF2C = new Q[nColumnF2C * nRowF2C];
-
-		// storage for the restricted values of the surface
-        innerPointF2C = new Q[nColumnF2C * nRowF2C];
-
 
 	 }
 
@@ -11327,23 +11294,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::swapWithLowerLevelCousin( int dire
     locy = globalKey[( N + M ) - 3 * ( combinedlevel - 1 ) - 2];
     locz = globalKey[( N + M ) - 3 * ( combinedlevel - 1 ) - 3];
 
-	// Lagrange coefficients p0@x0=0.5; p1@x1=1.5; p2@x2=3 in lower level; P_to_send@xu=1;	
- 	real Xif = 0.5;
-	real Xf  = 1.5;
-	real Xc  = 3.0;
-	real Xg  = 1.0;			
-	// lagrange coefficient for the layer below the surface
-	real phif = (Xg - Xf)*(Xg - Xc)/((Xif - Xf)*( Xif - Xc));
 
-	// lagrange coefficient for the surface value
-	real phf  = (Xg - Xif)*(Xg - Xc)/((Xf - Xif)*( Xf - Xc));
-	
-	/* check : old version */
-	/*
-	phf = 1.0;
-	phif = 0.0;	
-
-	*/
    for ( int i = 0; i < nbrs.size(); i++ )
     {
         point1 = ptrs.at( i );
@@ -11352,32 +11303,9 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::swapWithLowerLevelCousin( int dire
         if ( direction == 0 )
         {
 
-
-            // store surface and the inner surface values from point0 to face and innerFace
-            Intrp.fetchFaceF2C( point0, pxg, pyg, pzg, direction, faceTag, face,innerFace);
-
-			// restrict face to pointF2C
-            Intrp.restrictFace( face, nColumnFaceWGst, nRowFaceWGst, pointF2C );
-
-			// restrict inner face to innerPointF2C
-            Intrp.restrictFace( innerFace, nColumnFaceWGst, nRowFaceWGst, innerPointF2C );
-			
-			// interpolation before sending the ghost cells to coarse blocks
-		
-			for ( int row = 0; row < nRowF2C; row++ )
-             {
-              for ( int column = 0; column < nColumnF2C; column++ )
-                {
-				 	 // pointF2C is of type Q. multiplication operator is define as Q*number
-					 // before sending pointF2C it needs to be interpolated  	
-				
-						pointF2C[row*nColumnF2C + column] = pointF2C[row*nColumnF2C + column]*phf + innerPointF2C[row*nColumnF2C + column]*phif; 
-                
-				}
-            }
-
-
-
+			// updating the send buffer (pointF2C ) 
+			Intrp.updateSndBufferPreSwap(point0, pxg,pyg,pzg,direction,faceTag,pointF2C); 
+ 
 
             MPI_Isend( pointF2C, ( npy - 1 ) / 2 * ( npz - 1 ) / 2, contiguous, Com.myrank, count, MPI_COMM_SELF, &rcvReq[count] );
 
@@ -11392,28 +11320,10 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::swapWithLowerLevelCousin( int dire
         else if ( direction == 1 )
         {
 
-            // store surface and the inner surface values from point0 to face and innerFace
-            Intrp.fetchFaceF2C( point0, pxg, pyg, pzg, direction, faceTag, face,innerFace);
+			// updating the send buffer (pointF2C ) 
+			Intrp.updateSndBufferPreSwap(point0, pxg,pyg,pzg,direction,faceTag,pointF2C) ;
+ 
 
-			// restrict face to pointF2C
-            Intrp.restrictFace( face, nColumnFaceWGst, nRowFaceWGst, pointF2C );
-
-			// restrict inner face to innerPointF2C
-            Intrp.restrictFace( innerFace, nColumnFaceWGst, nRowFaceWGst, innerPointF2C );
-			
-			// interpolation before sending the ghost cells to coarse blocks
-		
-			for ( int row = 0; row < nRowF2C; row++ )
-             {
-              for ( int column = 0; column < nColumnF2C; column++ )
-                {
-				 	 // pointF2C is of type Q. multiplication operator is define as Q*number
-					 // before sending pointF2C it needs to be interpolated  	
-				
-						pointF2C[row*nColumnF2C + column] = pointF2C[row*nColumnF2C + column]*phf + innerPointF2C[row*nColumnF2C + column]*phif; 
-                
-				}
-            }
 
             MPI_Isend( pointF2C, ( npx - 1 ) / 2 * ( npz - 1 ) / 2, contiguous, Com.myrank, count, MPI_COMM_SELF, &rcvReq[count] );
             MPI_Irecv( point1 + (int)( !loc ) * ( npy + offset ) * ( npx + 1 ) + ( npx + 1 ) * ( npy + 1 ) + 1 + locx * ( npx - 1 ) / 2
@@ -11422,37 +11332,15 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::swapWithLowerLevelCousin( int dire
 
         
 
-
 		}
 
         else if ( direction == 2 )
         {
        
-             // store surface and the inner surface values from point0 to face and innerFace
-            Intrp.fetchFaceF2C( point0, pxg, pyg, pzg, direction, faceTag, face,innerFace);
 
-			// restrict face to pointF2C
-            Intrp.restrictFace( face, nColumnFaceWGst, nRowFaceWGst, pointF2C );
-
-			// restrict inner face to innerPointF2C
-            Intrp.restrictFace( innerFace, nColumnFaceWGst, nRowFaceWGst, innerPointF2C );
-			
-			// interpolation before sending the ghost cells to coarse blocks
-		
-			for ( int row = 0; row < nRowF2C; row++ )
-             {
-              for ( int column = 0; column < nColumnF2C; column++ )
-                {
-				 	 // pointF2C is of type Q. multiplication operator is define as Q*number
-					 // before sending pointF2C it needs to be interpolated  	
-				
-						pointF2C[row*nColumnF2C + column] = pointF2C[row*nColumnF2C + column]*phf + innerPointF2C[row*nColumnF2C + column]*phif; 
-                
-				}
-            }
-
+			// updating the send buffer (pointF2C ) 
+			Intrp.updateSndBufferPreSwap(point0, pxg,pyg,pzg,direction,faceTag,pointF2C);  
  
-
 
            MPI_Isend( pointF2C, ( npx - 1 ) / 2 * ( npy - 1 ) / 2, contiguous, Com.myrank, count, MPI_COMM_SELF, &rcvReq[count] );
 
@@ -11467,10 +11355,8 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::swapWithLowerLevelCousin( int dire
 
    }
 
-    delete[] pointF2C; 		pointF2C      = nullptr; // No dangling pointers
-	delete[] innerPointF2C; innerPointF2C = nullptr; // No dangling pointers
-    delete[] face;			face 		  = nullptr; // No dangling pointers
-	delete[] innerFace;		innerFace 	  = nullptr; // No dangling pointers
+    delete[] pointF2C; 		
+	pointF2C      = nullptr; // No dangling pointers
 
 
 // end of the member function
