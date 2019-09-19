@@ -1,5 +1,8 @@
 # Synopsis
-**rebl-AMR** is an Open-Source Software for Binarized-Octree Mesh Generation around Immersed Geometries. <br/>
+**rebl-AMR** 
+![alt text](https://github.com/GEM3D/rebl-AMR-V2/blob/master/f16_bunny.png)
+
+This is an Open-Source Software for Binarized-Octree Mesh Generation around Immersed Geometries. <br/>
 The main goal is to generate octrees for adaptive mesh refinement (AMR) of Cartesian domains with immersed complex geometries.
 
 ## Features
@@ -36,12 +39,11 @@ The executable will be placed in the /bin folder
 
 ## Run
 ```
-mpirun -np N ./bin/amrGem ./input/Geometry.stl nx ny nz 
+mpirun -np Nprocessor ./bin/amrGem ./input/Geometry.stl procLevel meshLevel 
 ```
-  * N: Number of processes (squared number)
-  * nx: Number of elements in X-direction
-  * ny: Number of elements in Y-direction
-  * nz: Number of elements in Z-direction
+  * NProcessor: Number of processes (squared number)
+  * proclevel : topology adaptation level
+  * meshlevel : gradient based adaptation level
  
 ## Visualization
   * The output is written to the /soln folder 
