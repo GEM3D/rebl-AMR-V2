@@ -49,6 +49,10 @@ mpirun -np Nprocessor ./bin/amrGem ./input/Geometry.stl procLevel meshLevel
   * The output is written to the /soln folder 
   * Paraview can be used to visualize the solution
   * Simply open the file ending with xdmf in soln/ 
+## Paraview Visualization:
+  * Poisson solution with Neumann and Dirichlet Boundary conditions
+![alt text](https://github.com/GEM3D/rebl-AMR-V2/blob/master/poisson.png)
+
 
 
 ## Directory structure
