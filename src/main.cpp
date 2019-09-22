@@ -66,7 +66,7 @@ int main( int argcs, char *pArgs[] )
 	const real Dirichlet[6] = {0.0, 0.0, 0.0,0.0,0.0,0.0};
     const real Neumann[6]   = {0.0, 0.0, 0.0,0.0,0.0,0.0};
 	const char bc[6]        = {'D','D','D','D','D','D'};
-	const real Epsilon      = 10E-8;
+	const real Epsilon      = 10E-14;
 
     ReblAmr<TREESIZE, Q, PROCSIZE, uint> AMR( argcs, pArgs, ancestorlength, ancestorcoords, npx, npy, npz );
 
@@ -74,14 +74,20 @@ int main( int argcs, char *pArgs[] )
     AMR.forestConstruct( argcs, pArgs, ancestorlength, ancestorcoords, npx, npy, npz );
     AMR.createComPattern();
 
-    real xx[3] = {0.0, 0.0, 0.0};
+    real xx[3] = {0.5, 0.0, 0.0};
     int  index = 0;
 
     AMR.moveGeometry( xx );
 	AMR.refineForest();
     AMR.allocatePointers();
-	//AMR.orderAnalysis(Epsilon,bc,Dirichlet,Neumann);
-	AMR.solvePoisson(Epsilon,bc,Dirichlet,Neumann);
+#if(TRNS_INTRP_TEST)
+	AMR.transInterpTest();
+#endif
+
+#if(!TRNS_INTRP_TEST)
+	AMR.orderAnalysis(Epsilon,bc,Dirichlet,Neumann);
+#endif	
+	//AMR.solvePoisson(Epsilon,bc,Dirichlet,Neumann);
 	AMR.getTotalMeshSize();
     AMR.writeMesh( index );
     AMR.writeRunInfo();

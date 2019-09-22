@@ -65,6 +65,8 @@ class ReblAmr
     void allocatePointers();
     void tagElemGradBased(); 
 
+// transverse interpolatin tests
+    void transInterpTest();
     ~ReblAmr(); /*!< destructor of the class*/
 };
 

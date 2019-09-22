@@ -64,12 +64,19 @@ void solver<Nvalue>::initializeTrigonometric( Nvalue *q, real *XYZ )
 
 #if ( !POISSON )
                 //		cout<<RED<<" pressure is initialized non-zero"<<RESET<<endl;
-                /*
-                        q[index].p = sin( freqScl * OMEGA0 * pi * x - pi / 2 ) * sin( freqScl * OMEGA1 * pi * y - pi / 2 )
+            /*    
+			        q[index].p = sin( freqScl * OMEGA0 * pi * x - pi / 2 ) * sin( freqScl * OMEGA1 * pi * y - pi / 2 )
                                              * sin( freqScl * OMEGA2 * pi * z - pi / 2 );
 
-                */
-                q[index].p = 0.0;
+        	*/
+     
+		  //  q[index].p = *XYZ;
+			
+			
+		     q[index].p = i;
+			 q[index].f = i+*XYZ;
+					
+
 #endif
 
 #if ( POISSON )
@@ -503,7 +510,12 @@ void solver<Nvalue>::imposeBoundaryXdirection( Nvalue *point, int faceTag, real*
                 int indexGhost = ( nxg ) * (nyg)*k + (nxg)*j + i;
 			    // initialize the boundaries with the exact equation for calculating the order of convergence using the MMS method
 	    	    point[indexGhost].p = exactValue(omega[0], x, tags[0])*exactValue(omega[1],y,tags[1])* exactValue(omega[2],z,tags[2]);
+
+#if(TRNS_INTRP_TEST)
 		
+				point[indexGhost].p = Dirichlet[0]; 
+#endif
+
 		      }  
 			  // check if the left face has Neumann boundary condition
 		      if(bc[0] == 'N') {
@@ -512,7 +524,7 @@ void solver<Nvalue>::imposeBoundaryXdirection( Nvalue *point, int faceTag, real*
 			  	 int indexInnerFace  = nxg * nyg * k + nxg * j + 2;
 			 	 // Neumann Boundary condition
 			     point[indexGhost].p  = point[indexInnerFace].p - Neumann[0]*2.0*delx;
-		
+	
 			  }
            
 		    }
@@ -540,7 +552,11 @@ void solver<Nvalue>::imposeBoundaryXdirection( Nvalue *point, int faceTag, real*
 
 			 // initialize the boundaries with the exact equation for calculating the order of convergence using the MMS method
 	    	 point[indexGhost].p = exactValue(omega[0], x, tags[0])*exactValue(omega[1],y,tags[1])* exactValue(omega[2],z,tags[2]);
-		
+
+#if(TRNS_INTRP_TEST)				
+			 point[indexGhost].p = Dirichlet[1]; 
+#endif
+	
 		   }
 		   // check if the right face has Neumann boundary condition
 		   if(bc[1] == 'N') {
@@ -599,9 +615,12 @@ void solver<Nvalue>::imposeBoundaryYdirection( Nvalue *point, int faceTag, real*
      	       	z = zmin + delz * real( k - start ) + delz * 0.5;
                 int indexGhost = ( nxg ) * (nyg)*k + (nxg)*j + i;
 			    // initialize the boundaries with the exact equation for calculating the order of convergence using the MMS method
-	    	    point[indexGhost].p = exactValue(omega[0], x, tags[0])*exactValue(omega[1],y,tags[1])* exactValue(omega[2],z,tags[2]);
-		
-		      }  
+	    	    point[indexGhost].p = exactValue(omega[0], x, tags[0])*exactValue(omega[1],y,tags[1])* exactValue(omega[2],z,tags[2]);		
+#if(TRNS_INTRP_TEST)		     
+			 point[indexGhost].p = Dirichlet[2]; 
+#endif
+
+				 }  
 			  // check if the left face has Neumann boundary condition
 		      if(bc[2] == 'N') {
 
@@ -631,7 +650,11 @@ void solver<Nvalue>::imposeBoundaryYdirection( Nvalue *point, int faceTag, real*
                 int indexGhost = ( nxg ) * (nyg)*k + (nxg)*j + i;
 			    // initialize the boundaries with the exact equation for calculating the order of convergence using the MMS method
 	    	    point[indexGhost].p = exactValue(omega[0], x, tags[0])*exactValue(omega[1],y,tags[1])* exactValue(omega[2],z,tags[2]);
-		
+#if(TRNS_INTRP_TEST) 	
+			 cout<<" boundary is not for MMS"<<endl;	
+			 point[indexGhost].p = Dirichlet[3]; 
+#endif
+
 		      }  
 			  // check if the left face has Neumann boundary condition
 		      if(bc[3] == 'N') {

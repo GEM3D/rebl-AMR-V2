@@ -8061,7 +8061,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::solvePoisson( T &proc, const real 
 
     real error   = 1.0;
     real Max, oldMax;
-    int  nloop = 201;
+    int  nloop = 2;
 
 
     S.setBC(bc,Dirichlet,Neumann);
@@ -8114,18 +8114,23 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::solvePoisson( T &proc, const real 
             }
         }
 
-        if ( itCount % 50 == 0 )
+        if ( itCount%20 == 0 )
         {
   //          myfile << "count : " << itCount << "  error : " << error << fixed << setprecision( 10 ) << endl;
 			 cout<<setw(4)<<itCount<<"  "<<error<<endl;
 		 }
 			
-		        
-		// swap
+		 
+		// swap boundary values
         swapGhostCells( proc );
 
- 		imposeBoundaryConditions(proc);
+		//transverse interpolations
+		//quadraticInterpTransverseDirection( proc);
 
+		// impose boundary conditions
+        imposeBoundaryConditions(proc);
+	
+	
 #if(EXACTBC_X || EXACTBC_Y || EXACTBC_Z)
 
 /* update Ghost cells with exact values */
@@ -8177,6 +8182,314 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::initializeTrigonometricForMMS( T &
 
 }
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::postSwaptestTransInterpolation( T &proc )
+{  // this function performs a test of Post-Swap interpolation of the pointF2C buffer
+
+/* strategies : 
+ * 1) initialize all the blocks with an square function 
+ * 2) swap -one direction  
+ * 3) check if the preSwap interpolations are done correctly
+ * 4) if so
+ * 5) post swap interpolate
+ * 6) check if it is correct
+ */
+    
+	real      XYZ[6];
+    morton<N> key;
+    Q *       point;
+	double    count = 0;
+
+	//int direction = 0 ;
+	//int faceTag   = 0;
+
+	for ( auto it = trees.begin(); it != trees.end(); it++ )
+     {
+        for ( auto it2 = ( *it ).begin(); it2 != ( *it ).end(); it2++ )
+        {     
+            key = ( it2->first );
+   
+           ( *it ).enclosingBox( key, XYZ );
+
+            point = it2->second;
+           
+			S.initializeTrigonometric( point, &count );
+    
+            count = count + 1;
+
+        }
+    }
+
+
+	auto it = trees.begin(); 
+		  it;
+	auto it2 = ( *it ).begin();
+		 it2; 
+		 key = ( it2->first );
+		 ( *it ).enclosingBox( key, XYZ );
+         point = it2->second;
+
+
+  cout<<" before swap"<<endl;
+
+  const real Dirichlet[6] = {100.0, -100.0, 200.0,-200.0,0.0,0.0};
+  const real Neumann[6]   = {0.0, 0.0, 0.0,0.0,0.0,0.0};
+  const char bc[6]        = {'D','D','D','D','D','D'};
+  
+     S.setBC(bc,Dirichlet,Neumann);
+/* 	 S.setBC(bc,Dirichlet,Neumann);
+*/    
+    imposeBoundaryConditionXdirection(proc);
+	imposeBoundaryConditionYdirection(proc);
+
+
+	// print it before any swap  
+	postSwapPrint2Display(point);
+// swap it  
+	swapGhostCells(proc);
+  	cout<<"\n after swap"<<endl;
+  	postSwapPrint2Display(point);
+//*************** we want to check a coarse block ***********//
+
+// transverse interpolate it
+	quadraticInterpTransverseDirection( proc);
+
+
+	cout<<"\n postSwap transInterp"<<endl;
+  	postSwapPrint2Display(point);
+// check if anything changed 
+	cout<<"\n boundary conditions imposed :"<<endl;
+	imposeBoundaryConditionXdirection(proc);
+	postSwapPrint2Display(point);
+
+}
+
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::postSwapPrint2Display(Nvalue *point)
+{
+	setprecision(4);
+	int index; 
+
+cout<<"\n ** p ** : "<<endl;
+
+ 	for ( int j = 0; j < pyg; j++ )
+     {    
+        for ( int i = 0; i < pxg; i++ )
+          {    
+				int k = 1;
+
+			 index = ( pxg ) * (pyg)*k + (pxg)*j + i;
+
+            // values below the surface
+            cout<<setw(10)<<point[index].p<<" ";
+
+          }
+		cout<<"\n";
+     }
+
+	cout<<"\n **** f ****"<<endl;
+
+ 	for ( int j = 0; j < pyg; j++ )
+     {    
+        for ( int i = 0; i < pxg; i++ )
+          {    
+				int k = 1;
+
+			 index = ( pxg ) * (pyg)*k + (pxg)*j + i;
+
+            // values below the surface
+            cout<<setw(10)<<point[index].f<<" ";
+
+          }
+		cout<<"\n";
+     }
+
+
+
+}
+
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::testTransInterpolationPrint2Display(Nvalue *point, int direction , int row, int column )
+{
+	setprecision(3);
+ 	for ( int k = 0; k < row; k++ )
+     {    
+        for ( int j = 0; j < column; j++ )
+          {    
+            // values below the surface
+            cout<<setw(5)<<point[k * column + j].p<<" ";
+
+          }
+		cout<<"\n";
+     }
+
+
+}
+
+
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
+void TemplateForest<N, Nvalue, M, Mvalue, T>::preSwaptestTransInterpolation( T &proc )
+{  // this function performs a test of Pre-swap interpolation of the pointF2C buffer
+
+    real      XYZ[6];
+    morton<N> key;
+    Q *       point;
+
+	int direction = 0 ;
+	int faceTag   = 0;
+
+	Q *face;
+	Q *innerFace;
+	Q *innerPointF2C;
+	Q *pointF2C;
+
+	int nRowFaceWGst;
+    int nColumnFaceWGst;
+    int nRowF2C;
+    int nColumnF2C;
+ 
+	// interpolation before sending the ghost cells to coarse blocks
+	real  Xg = 1.0; /*!<coordinate where the ghost needs to be calculated */
+	real  X1 = 0.5; /*!<coordinate of the first point in fine block*/
+	real  X2 = 1.5; /*!<coordinate of the second point infine block*/
+	real  X3 = 3.0; /*!<coordinate of the third point inside the coarse block*/
+
+	real  L1  = (Xg - X2)*(Xg - X3)/((X1 - X2)*( X1 - X3));
+	real  L2  = (Xg - X1)*(Xg - X3)/((X2 - X1)*( X2 - X3));
+	real  L3  = (Xg - X1)*(Xg - X2)/((X3 - X1)*( X3 - X2));
+
+	cout<<"L1 = "<<L1<<" , L2 ="<<L2<<" , L3 = "<<L3<<endl;
+
+    nRowFaceWGst    = pzg;
+    nColumnFaceWGst = pyg;
+    nRowF2C    = ( nRowFaceWGst - 2 ) / 2;
+    nColumnF2C = ( nColumnFaceWGst - 2 ) / 2;
+     // storage for the surface values
+    face     = new Q[nColumnFaceWGst * nRowFaceWGst];
+     // storage for the values below the surface
+    innerFace     = new Q[nColumnFaceWGst * nRowFaceWGst];
+     // storage for the restricted values of the surface
+    innerPointF2C = new Q[nColumnF2C * nRowF2C];
+	 // storage for the values to be sent
+    pointF2C = new Q[nColumnF2C * nRowF2C];
+
+
+	cout<<CYAN<<" ******Transver interpolation is being tested ****"<<RESET<<endl;
+
+	auto it = trees.begin(); 
+	auto it2 = ( *it ).begin(); 
+		 key = ( it2->first );
+        
+		 ( *it ).enclosingBox( key, XYZ );
+         point = it2->second;
+
+
+	uint  start = 0;
+    int  end   = start;
+    uint index;
+
+// initialization 
+#if(1)
+    for ( uint k = start; k < pzg - end; k++ )
+    {
+        for ( uint j = start; j < pyg - end; j++ )
+        {
+            for ( uint i = start; i < pxg - end; i++ )
+            {
+                index = ( pxg ) * (pyg)*k + (pxg)*j + i;
+	
+				point[index].p = i;
+			 }
+		 }
+	 }
+
+#endif
+//       S.initializeTrigonometric( point, XYZ );
+/*********************************************/
+
+#if(1)
+	 // store surface and the inner surface values from point0 to face and innerFace
+     Intrp.fetchFaceF2C( point, pxg, pyg, pzg, direction, faceTag, face,innerFace);
+
+	 cout<<" \n Extracted Face\n "<<endl;
+	 //print the fetched face to see if it is correct;
+	 testTransInterpolationPrint2Display(face,direction,nRowFaceWGst, nColumnFaceWGst);
+
+     // restrict face to pointF2C
+     Intrp.restrictFace( face, nColumnFaceWGst, nRowFaceWGst, pointF2C );
+
+     cout<<"\n Restricted face\n "<<endl;
+
+	 //print the fetched face to see if it is correct;
+	 testTransInterpolationPrint2Display(pointF2C,direction, nRowF2C, nColumnF2C);
+
+
+	 cout<<" \n Extracted innerFace \n "<<endl;
+	 //print the fetched face to see if it is correct;
+	 testTransInterpolationPrint2Display(innerFace,direction, nRowFaceWGst, nColumnFaceWGst);
+
+     // restrict inner face to innerPointF2C
+     Intrp.restrictFace( innerFace, nColumnFaceWGst, nRowFaceWGst, innerPointF2C );
+ 	
+ 	 cout<<"\n Restricted innerFace \n"<<endl;
+
+	 //print the fetched face to see if it is correct;
+	 testTransInterpolationPrint2Display(innerPointF2C,direction, nRowF2C, nColumnF2C);
+   
+ 
+		cout<<" \n Interpolation being done !!!"<<endl;
+
+     for ( int row = 0; row < nRowF2C; row++ )
+      {
+        for ( int column = 0; column < nColumnF2C; column++ )
+           {
+             // pointF2C is of type Q. multiplication operator is define as Q*number                                                                                                                  
+             // before sending pointF2C it needs to be interpolated     
+             
+            pointF2C[row*nColumnF2C + column].p = pointF2C[row*nColumnF2C + column].p*L2 + innerPointF2C[row*nColumnF2C + column].p*L1; 
+                
+           }
+      }
+
+	 cout<<"\n interpolated pointF2C: \n"<<endl;
+	 	// print the interpolated data
+	 testTransInterpolationPrint2Display(pointF2C,direction, nRowF2C, nColumnF2C);
+
+	 cout<<"\n END of PRE-SWAP INTERPOLATION \n "<<endl;
+/********* end of pre-swap transverse interpolation of send buffer pointF2C */
+	
+	 delete[] pointF2C;      pointF2C      = nullptr; // No dangling pointers 
+	
+	// now we see if our function performs all the above thing 
+    pointF2C = new Q[nColumnF2C * nRowF2C];
+    
+#endif
+	Intrp.updateSndBufferPreSwap(point, pxg,pyg,pzg,direction,faceTag,pointF2C); 
+	cout<<"\n pointF2C from updateSndBufferPreSwap \n"<<endl;
+	// print the interpolated data
+	 testTransInterpolationPrint2Display(pointF2C,direction, nRowF2C, nColumnF2C);
+
+
+
+
+
+
+
+
+
+ delete[] innerPointF2C; innerPointF2C = nullptr; // No dangling pointers
+ delete[] face;          face          = nullptr; // No dangling pointers
+ delete[] innerFace;     innerFace     = nullptr; // No dangling pointers 
+ delete[] pointF2C;      pointF2C      = nullptr; // No dangling pointers 
+
+}
+
+
+
+
+template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
 void TemplateForest<N, Nvalue, M, Mvalue, T>::orderAnalysis( T &proc, const real &Epsilon, const char*bc, const real* Dirichlet, const real* Neumann )
 {
 
@@ -8184,7 +8497,8 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::orderAnalysis( T &proc, const real
     morton<N> key;
     Q *       point;
     real      grad;
-    int       itCount = 1;
+    int       itCount = 0;
+	int 	  nCount  = 51;
 
     real Residual   = 1.0;
     real Max,localError, error;
@@ -8198,7 +8512,8 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::orderAnalysis( T &proc, const real
 
 	// iterative solution loop
    while(Residual >  Epsilon)
-    {
+   // while( itCount < nCount)
+	{
         Residual = 0.0;
         for ( auto it = trees.begin(); it != trees.end(); it++ )
         {
@@ -8213,7 +8528,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::orderAnalysis( T &proc, const real
             }
         }
 
-        if ( itCount % 20 == 0 )
+        if ( itCount % 200 == 0 )
         {
              cout<<setw(4)<<itCount<<"  "<<Residual<<endl;
         }
@@ -8222,7 +8537,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::orderAnalysis( T &proc, const real
         swapGhostCells( proc );
 
 		//transverse interpolations
-		//quadraticInterpTransverseDirection( proc);
+		quadraticInterpTransverseDirection( proc);
 
 		// impose boundary conditions
         imposeBoundaryConditions(proc);
@@ -8353,7 +8668,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::quadraticInterpTransverseDirection
       }
      if(QUAD_TRANS_Y_DIR_COUSIN)
      {
-        quadInterpTransDirXdirectionCousins( proc );
+        quadInterpTransDirYdirectionCousins( proc );
       }
     }
 
@@ -8363,7 +8678,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::quadraticInterpTransverseDirection
      {
         quadInterpTransDirZdirectionSiblings( proc );
       }
-     if(QUAD_TRANS_X_DIR_COUSIN)
+     if(QUAD_TRANS_Z_DIR_COUSIN)
      {
         quadInterpTransDirZdirectionCousins( proc );
       }
@@ -8373,6 +8688,8 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::quadraticInterpTransverseDirection
 template <size_t N, typename Nvalue, size_t M, typename Mvalue, class T>
 void TemplateForest<N, Nvalue, M, Mvalue, T>::quadInterpTransDirXdirectionCousins( T &proc )
 {
+//cout<<"quadInterp-cousin called"<<endl;
+
     real          XYZ[6];
     morton<N>     key, sibkey;
     Q *           point0;
@@ -8469,7 +8786,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::quadInterpTransDirXdirectionCousin
 		//Modified by : Shams          
 		//My neighbor is at a higher level  
         bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
-		int faceTag = loc;
+		int faceTag = !loc;
 		Intrp.updateRcvdGhstValWithnCoarseBlock(point0, pxg, pyg, pzg, direction,faceTag);
  
           }
@@ -8499,7 +8816,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::quadInterpTransDirXdirectionCousin
 		//Modified by : Shams          
 		//My neighbor is at a lower level  
         bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
-		int faceTag = loc;
+		int faceTag = !loc;
 		Intrp.updateRcvdGhstValWithnFineBlock(point0, pxg, pyg, pzg, direction,faceTag);
  
             }
@@ -8514,7 +8831,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::quadInterpTransDirXdirectionCousin
 		//Modified by : Shams          
 		//My neighbor is at a higher level  
         bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
-		int faceTag = loc;
+		int faceTag = !loc;
 		Intrp.updateRcvdGhstValWithnCoarseBlock(point0, pxg, pyg, pzg, direction,faceTag);
  
            }
@@ -8628,7 +8945,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::quadInterpTransDirYdirectionCousin
 		//Modified by : Shams          
 		//My neighbor is at a higher level  
         bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
-		int faceTag = loc;
+		int faceTag = !loc;
 		Intrp.updateRcvdGhstValWithnCoarseBlock(point0, pxg, pyg, pzg, direction,faceTag);
  
         }
@@ -8657,7 +8974,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::quadInterpTransDirYdirectionCousin
 		//Modified by : Shams          
 		//My neighbor is at a lower level  
         bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
-		int faceTag = loc;
+		int faceTag = !loc;
 		Intrp.updateRcvdGhstValWithnFineBlock(point0, pxg, pyg, pzg, direction,faceTag);
  
             }
@@ -8671,7 +8988,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::quadInterpTransDirYdirectionCousin
 		//Modified by : Shams          
 		//My neighbor is at a higher level  
         bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
-		int faceTag = loc;
+		int faceTag = !loc;
 		Intrp.updateRcvdGhstValWithnCoarseBlock(point0, pxg, pyg, pzg, direction,faceTag);
  
 			}
@@ -8786,7 +9103,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::quadInterpTransDirZdirectionCousin
 		//Modified by : Shams          
 		//My neighbor is at a higher level  
         bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
-		int faceTag = loc;
+		int faceTag = !loc;
 		Intrp.updateRcvdGhstValWithnCoarseBlock(point0, pxg, pyg, pzg, direction,faceTag);
  
 
@@ -8815,7 +9132,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::quadInterpTransDirZdirectionCousin
 		//Modified by : Shams          
 		//My neighbor is at a lower level  
         bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
-		int faceTag = loc;
+		int faceTag = !loc;
 		Intrp.updateRcvdGhstValWithnFineBlock(point0, pxg, pyg, pzg, direction,faceTag);
  
             }
@@ -8829,7 +9146,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::quadInterpTransDirZdirectionCousin
 		//Modified by : Shams          
 		//My neighbor is at a higher level  
         bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
-		int faceTag = loc;
+		int faceTag = !loc;
 		Intrp.updateRcvdGhstValWithnCoarseBlock(point0, pxg, pyg, pzg, direction,faceTag);
  
 			 }
@@ -8929,6 +9246,8 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::quadInterpTransDirXdirectionSiblin
 
        if(flag==3)
         {
+
+		//cout<<"flag =3  is called XSiblingQuad"<<endl;
      
 // notes for shams 
 // write a function to add q=q+c3*phi3, use point0
@@ -8937,7 +9256,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::quadInterpTransDirXdirectionSiblin
 		//Modified by : Shams          
 		//My neighbor is at a higher level  
         bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
-		int faceTag = loc;
+		int faceTag = !loc;
 		Intrp.updateRcvdGhstValWithnCoarseBlock(point0, pxg, pyg, pzg, direction,faceTag);
  
 		}
@@ -8946,11 +9265,14 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::quadInterpTransDirXdirectionSiblin
         {
 
 #if(1)
-           // if(flag!=3){
             constructTrueNbrKeysSiblings( seednbrkey, nbrseedlevel, nbrkey, realLevel, direction, nbrs, flag );
-
+		
+		//	cout<<"nbrs=4  is called XSiblingQuad"<<endl;
+ 
            if ( nbrs.size() == 4 )
             {
+
+
 // notes for shams 
 // write a function to add q=q+c3*phi3, use point0
 // here is the function to fill in
@@ -8963,7 +9285,8 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::quadInterpTransDirXdirectionSiblin
 		//Modified by : Shams          
 		//My neighbor is at a higher level  
         bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
-		int faceTag = loc;
+		int faceTag = !loc;
+		//cout<<" nbrs = 4,  faceTag = "<<faceTag <<endl;
 		Intrp.updateRcvdGhstValWithnCoarseBlock(point0, pxg, pyg, pzg, direction,faceTag);
  
 
@@ -9076,7 +9399,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::quadInterpTransDirYdirectionSiblin
 		//Modified by : Shams          
 		//My neighbor is at a higher level  
         bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
-		int faceTag = loc;
+		int faceTag = !loc;
 		Intrp.updateRcvdGhstValWithnCoarseBlock(point0, pxg, pyg, pzg, direction,faceTag);
  
             
@@ -9100,7 +9423,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::quadInterpTransDirYdirectionSiblin
 		//Modified by : Shams          
 		//My neighbor is at a higher level  
         bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
-		int faceTag = loc;
+		int faceTag = !loc;
 		Intrp.updateRcvdGhstValWithnCoarseBlock(point0, pxg, pyg, pzg, direction,faceTag);
  
 
@@ -9213,7 +9536,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::quadInterpTransDirZdirectionSiblin
 		//Modified by : Shams          
 		//My neighbor is at a higher level  
         bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
-		int faceTag = loc;
+		int faceTag = !loc;
 		Intrp.updateRcvdGhstValWithnCoarseBlock(point0, pxg, pyg, pzg, direction,faceTag);
  
            
@@ -9237,7 +9560,7 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::quadInterpTransDirZdirectionSiblin
 		//Modified by : Shams          
 		//My neighbor is at a higher level  
         bool loc= globalKey[N + M - 3 * ( combinedlevel - 1 ) - ( direction + 1 )];
-		int faceTag = loc;
+		int faceTag = !loc;
 		Intrp.updateRcvdGhstValWithnCoarseBlock(point0, pxg, pyg, pzg, direction,faceTag);
  
 
@@ -11322,8 +11645,6 @@ void TemplateForest<N, Nvalue, M, Mvalue, T>::swapWithLowerLevelCousin( int dire
 
 			// updating the send buffer (pointF2C ) 
 			Intrp.updateSndBufferPreSwap(point0, pxg,pyg,pzg,direction,faceTag,pointF2C) ;
- 
-
 
             MPI_Isend( pointF2C, ( npx - 1 ) / 2 * ( npz - 1 ) / 2, contiguous, Com.myrank, count, MPI_COMM_SELF, &rcvReq[count] );
             MPI_Irecv( point1 + (int)( !loc ) * ( npy + offset ) * ( npx + 1 ) + ( npx + 1 ) * ( npy + 1 ) + 1 + locx * ( npx - 1 ) / 2

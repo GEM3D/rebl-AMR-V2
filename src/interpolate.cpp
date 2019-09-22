@@ -307,6 +307,322 @@ void interpolate<Nvalue>::getInterpolantNodes( const Nvalue *soln, const int nro
 
 
 template <typename Nvalue>
+void interpolate<Nvalue>::sndBufferTestCaseWithnFineBlock(Nvalue *point0, const int pxg, const int pyg, const int pzg, const int direction,const int faceTag) 
+{
+// this function does the transverse interpolation on the send buffer (pre-swap interpolation) when data exchanged from fine block to coarse one
+
+
+    Q *face          = nullptr;
+    Q *innerFace     = nullptr;
+    Q *innerPointF2C = nullptr;	
+	Q *pointF2C  	 = nullptr;
+	
+	int nRowFaceWGst;
+    int nColumnFaceWGst;
+    int nRowF2C;
+    int nColumnF2C;
+
+    if ( direction == 0 )
+    {
+        nRowFaceWGst    = pzg;
+        nColumnFaceWGst = pyg;
+
+        nRowF2C    = ( nRowFaceWGst - 2 ) / 2;
+        nColumnF2C = ( nColumnFaceWGst - 2 ) / 2;
+         
+	  // storage for the values to be sent
+        pointF2C = new Q[nColumnF2C * nRowF2C];
+     
+        // storage for the surface values
+        face     = new Q[nColumnFaceWGst * nRowFaceWGst];
+
+        // storage for the values below the surface
+        innerFace     = new Q[nColumnFaceWGst * nRowFaceWGst];
+
+        // storage for the restricted values of the surface
+        innerPointF2C = new Q[nColumnF2C * nRowF2C];
+
+              
+    }
+ else if ( direction == 1 )
+    {
+        nRowFaceWGst    = pzg;
+        nColumnFaceWGst = pxg;
+
+        nRowF2C    = ( nRowFaceWGst - 2 ) / 2;
+        nColumnF2C = ( nColumnFaceWGst - 2 ) / 2;
+
+		  // storage for the values to be sent
+        pointF2C = new Q[nColumnF2C * nRowF2C];
+
+        // storage for the surface values
+        face     = new Q[nColumnFaceWGst * nRowFaceWGst];
+
+        // storage for the values below the surface
+        innerFace     = new Q[nColumnFaceWGst * nRowFaceWGst];
+
+        // storage for the restricted values of the surface
+        innerPointF2C = new Q[nColumnF2C * nRowF2C];
+
+    }
+  else
+    {
+        nRowFaceWGst    = pyg;
+        nColumnFaceWGst = pxg;
+
+        nRowF2C    = ( nRowFaceWGst - 2 ) / 2;
+        nColumnF2C = ( nColumnFaceWGst - 2 ) / 2;
+
+	     // storage for the values to be sent
+        pointF2C = new Q[nColumnF2C * nRowF2C];
+
+        // storage for the surface values
+        face     = new Q[nColumnFaceWGst * nRowFaceWGst];
+
+        // storage for the values below the surface
+        innerFace     = new Q[nColumnFaceWGst * nRowFaceWGst];
+
+        // storage for the restricted values of the surface
+        innerPointF2C = new Q[nColumnF2C * nRowF2C];
+
+
+     }
+
+	real  Xg = 1.0; /*!<coordinate where the ghost needs to be calculated */
+    real  X1 = 0.5; /*!<coordinate of the first point in fine block*/
+    real  X2 = 1.5; /*!<coordinate of the second point infine block*/
+    real  X3 = 3.0; /*!<coordinate of the third point inside the coarse block*/
+
+    real  L1  = (Xg - X2)*(Xg - X3)/((X1 - X2)*( X1 - X3));
+    real  L2  = (Xg - X1)*(Xg - X3)/((X2 - X1)*( X2 - X3));
+    real  L3  = (Xg - X1)*(Xg - X2)/((X3 - X1)*( X3 - X2));
+
+
+	// store surface and the inner surface values from point0 to face and innerFace
+    fetchFaceF2C( point0, pxg, pyg, pzg, direction, faceTag, face,innerFace);
+
+    // restrict face to pointF2C
+    restrictFace( face, nColumnFaceWGst, nRowFaceWGst, pointF2C );
+
+	if(PRESWAPTRANSINTERPOLATION) {
+		
+	cout<<" pre-swap interpolation is invoked "<<endl;
+
+    // restrict inner face to innerPointF2C
+    restrictFace( innerFace, nColumnFaceWGst, nRowFaceWGst, innerPointF2C );
+            
+    // interpolation before sending the ghost cells to coarse blocks
+        
+    for ( int row = 0; row < nRowF2C; row++ )
+     {
+       for ( int column = 0; column < nColumnF2C; column++ )
+          {
+            // pointF2C is of type Q. multiplication operator is define as Q*number                                                                                                                  
+            // before sending pointF2C it needs to be interpolated     
+             
+			pointF2C[row*nColumnF2C + column].p = pointF2C[row*nColumnF2C + column].p*L2 + innerPointF2C[row*nColumnF2C + column].p*L1; 
+                
+			pointF2C[row*nColumnF2C + column].f = pointF2C[row*nColumnF2C + column].f*L2 + innerPointF2C[row*nColumnF2C + column].f*L1; 
+                
+          }
+     }
+
+ }
+
+ delete[] innerPointF2C; innerPointF2C = nullptr; // No dangling pointers
+ delete[] face;          face          = nullptr; // No dangling pointers
+ delete[] innerFace;     innerFace     = nullptr; // No dangling pointers 
+
+}
+
+template <typename Nvalue>
+void interpolate<Nvalue>::updateRcvdGhstValWithnFineBlock(Nvalue *point0, const int pxg, const int pyg, const int pzg, const int direction,const int faceTag)
+{
+	/*!< This function interpolates the Ghost value in fine blocks after receiving the Ghost value from the coarse blocks 
+ 	 *   Using lagrange interpolation
+ 	 */
+
+real  Xg = 0.5; /*!<coordinate where the ghost needs to be calculated */
+real  X1 = 0.0; /*!<coordinate of the first point(ghost)received from the coarse block*/
+real  X2 = 1.5; /*!<coordinate of the second point inside the fine block*/
+real  X3 = 2.5; /*!<coordinate of the third point inside the fine block*/
+
+
+real  L1  = (Xg - X2)*(Xg - X3)/((X1 - X2)*( X1 - X3));
+real  L2  = (Xg - X1)*(Xg - X3)/((X2 - X1)*( X2 - X3));
+real  L3  = (Xg - X1)*(Xg - X2)/((X3 - X1)*( X3 - X2));
+
+
+// x direction 
+    if ( direction == 0 )
+    {
+        switch ( faceTag )
+        {
+            case 0: 
+
+                for ( int k = 1; k < pzg -1 ; k++ )
+                {
+                    for ( int j = 1; j < pyg -1; j++ )
+                    {
+                        int indexGhost = ( pxg ) * (pyg)*k + (pxg)*j  +  0;
+						int point1    = indexGhost;
+                        int point2    = indexGhost + 1;
+                        int point3    = indexGhost + 2;
+               
+                        point0[indexGhost].p =  point0[point1].p*L1 + point0[point2].p*L2 + point0[point3].p*L3;
+               
+                        point0[indexGhost].f=  point0[point1].f*L1 + point0[point2].f*L2 + point0[point3].f*L3;
+               
+    
+                    }
+                }
+
+                break;
+
+            case 1: // right face 
+
+                for ( int k = 1; k < pzg -1; k++ )
+                {
+                    for ( int j = 1; j < pyg -1; j++ )
+                    {
+                    
+				            int indexGhost = ( pxg ) * (pyg)*k + (pxg)*j + pxg-1;
+                			int point1    = indexGhost;
+                        	int point2    = indexGhost - 1;
+                        	int point3    = indexGhost - 2;
+               
+				            point0[indexGhost].p =  point0[point1].p*L1 + point0[point2].p*L2 + point0[point3].p*L3;
+               		
+                	        point0[indexGhost].f=  point0[point1].f*L1 + point0[point2].f*L2 + point0[point3].f*L3;
+                                              
+                
+
+
+					}
+                }
+
+                break;
+        }
+    }
+    else if ( direction == 1 ) // y direction 
+    {
+        switch ( faceTag )
+        {
+            case 0: // left face j = 1;
+
+                for ( int k = 1; k < pzg-1; k++ )
+                {
+                    for ( int i = 1; i < pxg-1; i++ )
+                    {
+
+							int indexGhost = ( pxg ) * (pyg)*k + (pxg)*0 + i;
+                 			int point1    = indexGhost;
+	           				int point2 = ( pxg ) * (pyg)*k + (pxg)*(1)+ i;
+	           				int point3 = ( pxg ) * (pyg)*k + (pxg)*(2)+ i;
+ 
+              
+				            point0[indexGhost].p =  point0[point1].p*L1 + point0[point2].p*L2 + point0[point3].p*L3;
+               		
+                	        point0[indexGhost].f=  point0[point1].f*L1 + point0[point2].f*L2 + point0[point3].f*L3;
+                                              
+             
+
+
+
+                    }
+                }
+
+                break;
+
+            case 1: // right face j = pyg-2
+
+                for ( int k = 1; k < pzg-1; k++ )
+                {
+                    for ( int i = 1; i < pxg-1; i++ )
+                    {
+	           				int indexGhost = ( pxg ) * (pyg)*k + (pxg)*(pyg-1)+ i;
+               				int point1 = indexGhost;
+	           				int point2 = ( pxg ) * (pyg)*k + (pxg)*(pyg-2)+ i;
+	           				int point3 = ( pxg ) * (pyg)*k + (pxg)*(pyg-3)+ i;
+                             
+               
+				            point0[indexGhost].p =  point0[point1].p*L1 + point0[point2].p*L2 + point0[point3].p*L3;
+               		
+                	        point0[indexGhost].f=  point0[point1].f*L1 + point0[point2].f*L2 + point0[point3].f*L3;
+                                              
+             
+
+   
+
+
+
+                   }
+                }
+
+                break;
+        }
+    }
+    else // Z direction 
+    {
+        switch ( faceTag )
+        {
+            case 0: // left face k = 1;
+
+                for ( int j = 1; j < pyg-1; j++ )
+                {
+                    for ( int i = 1; i < pxg-1; i++ )
+                    {
+
+                        int indexGhost  = ( pxg ) * (pyg)*0 + (pxg)*j + i;
+                        int point1      = indexGhost ;
+                        int point2		= ( pxg ) * (pyg)*1 + (pxg)*j + i;
+                        int point3 		= ( pxg ) * (pyg)*2 + (pxg)*j + i;
+ 
+				            point0[indexGhost].p =  point0[point1].p*L1 + point0[point2].p*L2 + point0[point3].p*L3;
+               		
+                	        point0[indexGhost].f=  point0[point1].f*L1 + point0[point2].f*L2 + point0[point3].f*L3;
+                                              
+             
+
+   
+
+
+                    }
+                }
+
+                break;
+
+            case 1: // right face k = pzg -2;
+
+                for ( int j = 1; j < pyg-1; j++ )
+                {
+                    for ( int i = 1; i < pxg-1; i++ )
+                    {
+
+                        int indexGhost = ( pxg ) * (pyg)*(pzg-1) + (pxg)*j + i;
+						int point1     = indexGhost;
+                        int point2		= ( pxg ) * (pyg)*(pzg-2) + (pxg)*j + i;
+                        int point3 		= ( pxg ) * (pyg)*(pzg-3) + (pxg)*j + i;
+  
+				            point0[indexGhost].p =  point0[point1].p*L1 + point0[point2].p*L2 + point0[point3].p*L3;
+               		
+                	        point0[indexGhost].f=  point0[point1].f*L1 + point0[point2].f*L2 + point0[point3].f*L3;
+                                              
+             
+
+
+
+                
+                    }
+                }
+
+                break;
+        }
+    }
+}
+
+
+template <typename Nvalue>
 void interpolate<Nvalue>::updateSndBufferPreSwap(Nvalue *point0, const int pxg, const int pyg, const int pzg, const int direction,const int faceTag,Nvalue*pointF2C) 
 {
 // this function does the transverse interpolation on the send buffer (pre-swap interpolation) when data exchanged from fine block to coarse one
@@ -386,7 +702,8 @@ void interpolate<Nvalue>::updateSndBufferPreSwap(Nvalue *point0, const int pxg, 
     real  L1  = (Xg - X2)*(Xg - X3)/((X1 - X2)*( X1 - X3));
     real  L2  = (Xg - X1)*(Xg - X3)/((X2 - X1)*( X2 - X3));
     real  L3  = (Xg - X1)*(Xg - X2)/((X3 - X1)*( X3 - X2));
-
+	
+//	cout<<" L1 = "<<L1 <<" ,L2 = "<<L2 << " , L3 = "<<L3 <<endl;
 
 	// store surface and the inner surface values from point0 to face and innerFace
     fetchFaceF2C( point0, pxg, pyg, pzg, direction, faceTag, face,innerFace);
@@ -394,191 +711,36 @@ void interpolate<Nvalue>::updateSndBufferPreSwap(Nvalue *point0, const int pxg, 
     // restrict face to pointF2C
     restrictFace( face, nColumnFaceWGst, nRowFaceWGst, pointF2C );
 
+    if(PRESWAPTRANSINTERPOLATION) {
+             
+ //  cout<<" pre-swap interpolation is invoked "<<endl;
+
     // restrict inner face to innerPointF2C
     restrictFace( innerFace, nColumnFaceWGst, nRowFaceWGst, innerPointF2C );
-            
+                 
     // interpolation before sending the ghost cells to coarse blocks
-        
+             
     for ( int row = 0; row < nRowF2C; row++ )
-     {
+     {    
        for ( int column = 0; column < nColumnF2C; column++ )
-          {
+          {    
             // pointF2C is of type Q. multiplication operator is define as Q*number                                                                                                                  
             // before sending pointF2C it needs to be interpolated     
-             
-			pointF2C[row*nColumnF2C + column] = pointF2C[row*nColumnF2C + column]*L2 + innerPointF2C[row*nColumnF2C + column]*L1; 
-                
-          }
-     }
+                  
+            pointF2C[row*nColumnF2C + column].p = pointF2C[row*nColumnF2C + column].p*L2 + innerPointF2C[row*nColumnF2C + column].p*L1;      
+                     
+            pointF2C[row*nColumnF2C + column].f = pointF2C[row*nColumnF2C + column].f*L2 + innerPointF2C[row*nColumnF2C + column].f*L1; 
+                     
+          }    
+     }    
 
+ }
 
 
  delete[] innerPointF2C; innerPointF2C = nullptr; // No dangling pointers
  delete[] face;          face          = nullptr; // No dangling pointers
  delete[] innerFace;     innerFace     = nullptr; // No dangling pointers 
 
-}
-
-template <typename Nvalue>
-void interpolate<Nvalue>::updateRcvdGhstValWithnFineBlock(Nvalue *point0, const int pxg, const int pyg, const int pzg, const int direction,const int faceTag)
-{
-	/*!< This function interpolates the Ghost value in fine blocks after receiving the Ghost value from the coarse blocks 
- 	 *   Using lagrange interpolation
- 	 */
-
-real  Xg = 0.5; /*!<coordinate where the ghost needs to be calculated */
-real  X1 = 0.0; /*!<coordinate of the first point(ghost)received from the coarse block*/
-real  X2 = 1.5; /*!<coordinate of the second point inside the fine block*/
-real  X3 = 2.5; /*!<coordinate of the third point inside the fine block*/
-
-
-real  L1  = (Xg - X2)*(Xg - X3)/((X1 - X2)*( X1 - X3));
-real  L2  = (Xg - X1)*(Xg - X3)/((X2 - X1)*( X2 - X3));
-real  L3  = (Xg - X1)*(Xg - X2)/((X3 - X1)*( X3 - X2));
-
-
-// x direction 
-    if ( direction == 0 )
-    {
-        switch ( faceTag )
-        {
-            case 0: 
-
-                for ( int k = 0; k < pzg; k++ )
-                {
-                    for ( int j = 0; j < pyg; j++ )
-                    {
-                        int indexGhost = ( pxg ) * (pyg)*k + (pxg)*j  +  0;
-						int point1    = indexGhost;
-                        int point2    = indexGhost + 1;
-                        int point3    = indexGhost + 2;
-               
-                        point0[indexGhost] =  point0[point1]*L1 + point0[point2]*L2 + point0[point3]*L3;
-                
-                         
-                    }
-                }
-
-                break;
-
-            case 1: // right face 
-
-                for ( int k = 0; k < pzg; k++ )
-                {
-                    for ( int j = 0; j < pyg; j++ )
-                    {
-                    
-				            int indexGhost = ( pxg ) * (pyg)*k + (pxg)*j + pxg-1;
-                			int point1    = indexGhost;
-                        	int point2    = indexGhost - 1;
-                        	int point3    = indexGhost - 2;
-               
-                        point0[indexGhost] =  point0[point1]*L1 + point0[point2]*L2 + point0[point3]*L3;
-                                
-                                
-                
-
-
-					}
-                }
-
-                break;
-        }
-    }
-    else if ( direction == 1 ) // y direction 
-    {
-        switch ( faceTag )
-        {
-            case 0: // left face j = 1;
-
-                for ( int k = 0; k < pzg; k++ )
-                {
-                    for ( int i = 0; i < pxg; i++ )
-                    {
-
-							int indexGhost = ( pxg ) * (pyg)*k + (pxg)*0 + i;
-                 			int point1    = indexGhost;
-	           				int point2 = ( pxg ) * (pyg)*k + (pxg)*(1)+ i;
-	           				int point3 = ( pxg ) * (pyg)*k + (pxg)*(2)+ i;
- 
-              
-                        point0[indexGhost] =  point0[point1]*L1 + point0[point2]*L2 + point0[point3]*L3;
-               
-
-
-
-
-                    }
-                }
-
-                break;
-
-            case 1: // right face j = pyg-2
-
-                for ( int k = 0; k < pzg; k++ )
-                {
-                    for ( int i = 0; i < pxg; i++ )
-                    {
-	           				int indexGhost = ( pxg ) * (pyg)*k + (pxg)*(pyg-1)+ i;
-               				int point1 = indexGhost;
-	           				int point2 = ( pxg ) * (pyg)*k + (pxg)*(pyg-2)+ i;
-	           				int point3 = ( pxg ) * (pyg)*k + (pxg)*(pyg-3)+ i;
-                             
-                        point0[indexGhost] =  point0[point1]*L1 + point0[point2]*L2 + point0[point3]*L3;
-               
-
-
-
-                   }
-                }
-
-                break;
-        }
-    }
-    else // Z direction 
-    {
-        switch ( faceTag )
-        {
-            case 0: // left face k = 1;
-
-                for ( int j = 0; j < pyg; j++ )
-                {
-                    for ( int i = 0; i < pxg; i++ )
-                    {
-
-                        int indexGhost  = ( pxg ) * (pyg)*0 + (pxg)*j + i;
-                        int point1      = indexGhost ;
-                        int point2		= ( pxg ) * (pyg)*1 + (pxg)*j + i;
-                        int point3 		= ( pxg ) * (pyg)*2 + (pxg)*j + i;
-                        point0[indexGhost] =  point0[point1]*L1 + point0[point2]*L2 + point0[point3]*L3;
-
-
-                    }
-                }
-
-                break;
-
-            case 1: // right face k = pzg -2;
-
-                for ( int j = 0; j < pyg; j++ )
-                {
-                    for ( int i = 0; i < pxg; i++ )
-                    {
-
-                        int indexGhost = ( pxg ) * (pyg)*(pzg-1) + (pxg)*j + i;
-						int point1     = indexGhost;
-                        int point2		= ( pxg ) * (pyg)*(pzg-2) + (pxg)*j + i;
-                        int point3 		= ( pxg ) * (pyg)*(pzg-3) + (pxg)*j + i;
-                        point0[indexGhost] =  point0[point1]*L1 + point0[point2]*L2 + point0[point3]*L3;
-
-
-                
-                    }
-                }
-
-                break;
-        }
-    }
 }
 
 
@@ -608,9 +770,9 @@ real  L3  = (Xg - X1)*(Xg - X2)/((X3 - X1)*( X3 - X2));
         {
             case 0: // left face i = 1
 
-                for ( int k = 0; k < pzg; k++ )
+                for ( int k = 1; k < pzg-1; k++ )
                 {
-                    for ( int j = 0; j < pyg; j++ )
+                    for ( int j = 1; j < pyg-1; j++ )
                     {
                         int i = 0;
 
@@ -618,7 +780,9 @@ real  L3  = (Xg - X1)*(Xg - X2)/((X3 - X1)*( X3 - X2));
                                       
                         int point3     = ( pxg ) * (pyg)*k + (pxg)*j + (i+1);
                                       
-                        point0[indexGhost] =  point0[indexGhost] + point0[point3]*L3;
+                        point0[indexGhost].p =  point0[indexGhost].p + point0[point3].p*L3;
+                
+                        point0[indexGhost].f =  point0[indexGhost].f + point0[point3].f*L3;
                 
                          
                     }
@@ -628,9 +792,9 @@ real  L3  = (Xg - X1)*(Xg - X2)/((X3 - X1)*( X3 - X2));
 
             case 1: // right face i = pxg-2
 
-                for ( int k = 0; k < pzg; k++ )
+                for ( int k = 1; k < pzg-1; k++ )
                 {
-                    for ( int j = 0; j < pyg; j++ )
+                    for ( int j = 1; j < pyg-1; j++ )
                     {
                         int i = pxg - 1;
                     
@@ -638,9 +802,10 @@ real  L3  = (Xg - X1)*(Xg - X2)/((X3 - X1)*( X3 - X2));
                                 
                             int point3  = ( pxg ) * (pyg)*k + (pxg)*j + (i-1);
                                 
-			  			    point0[indexGhost] =  point0[indexGhost] + point0[point3]*L3;
-                
 
+                        point0[indexGhost].p =  point0[indexGhost].p + point0[point3].p*L3;
+                
+                        point0[indexGhost].f =  point0[indexGhost].f + point0[point3].f*L3;
 
 					}
                 }
@@ -654,9 +819,9 @@ real  L3  = (Xg - X1)*(Xg - X2)/((X3 - X1)*( X3 - X2));
         {
             case 0: // left face j = 1;
 
-                for ( int k = 0; k < pzg; k++ )
+                for ( int k = 1; k < pzg-1; k++ )
                 {
-                    for ( int i = 0; i < pxg; i++ )
+                    for ( int i = 1; i < pxg-1; i++ )
                     {
                         int j = 0;
 
@@ -664,8 +829,10 @@ real  L3  = (Xg - X1)*(Xg - X2)/((X3 - X1)*( X3 - X2));
                                       
                         int point3  = ( pxg ) * (pyg)*k + (pxg)*(j+1) +i;
                                       
-                  		point0[indexGhost] =  point0[indexGhost] + point0[point3]*L3;
+                        point0[indexGhost].p =  point0[indexGhost].p + point0[point3].p*L3;
                 
+                        point0[indexGhost].f =  point0[indexGhost].f + point0[point3].f*L3;
+
 
 
 
@@ -677,9 +844,9 @@ real  L3  = (Xg - X1)*(Xg - X2)/((X3 - X1)*( X3 - X2));
 
             case 1: // right face j = pyg-2
 
-                for ( int k = 0; k < pzg; k++ )
+                for ( int k = 1; k < pzg-1; k++ )
                 {
-                    for ( int i = 0; i < pxg; i++ )
+                    for ( int i = 1; i < pxg-1; i++ )
                     {
  
 					  int j = pyg - 1;
@@ -688,8 +855,12 @@ real  L3  = (Xg - X1)*(Xg - X2)/((X3 - X1)*( X3 - X2));
 
 	                     int point3 = ( pxg ) * (pyg)*k + (pxg)*(j-1) + i;
                 
-  						 point0[indexGhost] =  point0[indexGhost] + point0[point3]*L3;
+                         point0[indexGhost].p =  point0[indexGhost].p + point0[point3].p*L3;
                 
+                        point0[indexGhost].f =  point0[indexGhost].f + point0[point3].f*L3;
+
+
+               
 
                    }
                 }
@@ -703,9 +874,9 @@ real  L3  = (Xg - X1)*(Xg - X2)/((X3 - X1)*( X3 - X2));
         {
             case 0: // left face k = 1;
 
-                for ( int j = 0; j < pyg; j++ )
+                for ( int j = 1; j < pyg-1; j++ )
                 {
-                    for ( int i = 0; i < pxg; i++ )
+                    for ( int i = 1; i < pxg-1; i++ )
                     {
                         int k = 0;
 
@@ -713,8 +884,14 @@ real  L3  = (Xg - X1)*(Xg - X2)/((X3 - X1)*( X3 - X2));
 
                         int point3 = ( pxg ) * (pyg)*(k+1) + (pxg)*j + i;
 
-						  point0[indexGhost] =  point0[indexGhost] + point0[point3]*L3;
+                point0[indexGhost].p =  point0[indexGhost].p + point0[point3].p*L3;
                 
+                        point0[indexGhost].f =  point0[indexGhost].f + point0[point3].f*L3;
+
+
+               
+
+
 
 
                     }
@@ -724,9 +901,9 @@ real  L3  = (Xg - X1)*(Xg - X2)/((X3 - X1)*( X3 - X2));
 
             case 1: // right face k = pzg -2;
 
-                for ( int j = 0; j < pyg; j++ )
+                for ( int j = 1; j < pyg-1; j++ )
                 {
-                    for ( int i = 0; i < pxg; i++ )
+                    for ( int i = 1; i < pxg-1; i++ )
                     {
                         int k = pzg - 1;
 
@@ -734,8 +911,11 @@ real  L3  = (Xg - X1)*(Xg - X2)/((X3 - X1)*( X3 - X2));
 
                         int point3 = ( pxg ) * (pyg)*(k-1) + (pxg)*j + i;
                 
-                  		  point0[indexGhost] =  point0[indexGhost] + point0[point3]*L3;
+                	point0[indexGhost].p =  point0[indexGhost].p + point0[point3].p*L3;
                 
+                        point0[indexGhost].f =  point0[indexGhost].f + point0[point3].f*L3;
+
+
                     }
                 }
 

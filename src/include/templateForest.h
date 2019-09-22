@@ -240,7 +240,10 @@ void quadInterpTransDirXdirectionCousins(T &proc );
 void quadInterpTransDirYdirectionCousins(T &proc );
 void quadInterpTransDirZdirectionCousins(T &proc );
 
-
+void preSwaptestTransInterpolation( T &proc );
+void testTransInterpolationPrint2Display(Nvalue *point, int direction, int row, int column );
+void postSwaptestTransInterpolation(T &proc);
+void postSwapPrint2Display(Nvalue *point);
 
 ~TemplateForest(); /*!< Destructor of the object*/
 

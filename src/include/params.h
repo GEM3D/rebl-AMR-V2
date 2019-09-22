@@ -6,8 +6,8 @@
  */
 
 #define METHOD   2
-#define POISSON  1 /* if set to 1, Poisson will be solved */
-
+#define POISSON  0 /* if set to 1, Poisson will be solved */
+#define TRNS_INTRP_TEST 0
 
 #define EXACTBC_X 0  /* if set to 1, the boundary values along X will be set to Exact */
 #define EXACTBC_Y 0  /* if set to 1, the boundary values along Y will be set to Exact */
@@ -24,7 +24,7 @@ enum ReblAmrParameters: uint
     ZOLTAN_ON 	= 1 , /*!< turn zoltan on and off*/
     ZOLTAN_GEOMETRIC_PARTITION = 1, /*!< partition using geometric methods HSFC  */
     WEIGHT 		= 1, /*!< use the eighted version of HSFC */
-    WR  		= 2, /*!<controls the output, set 0 to turn it off, set to 1 for polyvertex and set 2 for multiblock*/
+    WR  		= 0, /*!<controls the output, set 0 to turn it off, set to 1 for polyvertex and set 2 for multiblock*/
     WEAK		= 0, /*!< set to 0 for weak scaling to 1 for strong, default is 0  */
     WSIZE 		= 3, /*!< size of the container for full tree  */
     REORDER 	= 0, /*!< redoredr processors in MPI_Ineighbir.... */
@@ -33,9 +33,9 @@ enum ReblAmrParameters: uint
   
 //    ZOLTAN_DEBUG=1, /*!< defines the debug level of zoltan*/  
     /*!< discretization in x,y, and zdirections */
-    npx=11, /* Keep them above 5, because we need 3 points for quadratic interpolation */
-    npy=11, /* Keep them above 5, because we need 3 points for quadratic interpolation */
-    npz=11, /* Keep them above 5, because we need 3 points for quadratic interpolation */
+    npx= 33, /* Keep them above 5, because we need 3 points for quadratic interpolation */
+    npy= 33, /* Keep them above 5, because we need 3 points for quadratic interpolation */
+    npz= 33, /* Keep them above 5, because we need 3 points for quadratic interpolation */
 
     CHECK_MESH=0,
     MPI_ERROR_DISABLE  = 0,        /*! if set to 1 it will reset MPI_ERROR_FATAl to MPI_ERROR_RETURN */
@@ -57,21 +57,21 @@ enum ReblAmrParameters: uint
     SWAP_Z_DIR_SIBLING=1, /*!< Swap X face  */
     SWAP_Z_DIR_COUSIN=1, /*!< Swap X face  */
    
-	GS =1,              /*!< set to 1 for Gauss-Siedel, set 0 for redBlack GS */
+	GS = 0,              /*!< set to 1 for Gauss-Siedel, set 0 for redBlack GS */
     
-	 QUAD_TRANS_X_DIR =1, 
-	 QUAD_TRANS_X_DIR_SIBLING=1,
-	 QUAD_TRANS_X_DIR_COUSIN=1,
+	QUAD_TRANS_X_DIR = 0, 
+	QUAD_TRANS_X_DIR_SIBLING=1,
+	QUAD_TRANS_X_DIR_COUSIN=1,
 
- 	QUAD_TRANS_Y_DIR =1,
+ 	QUAD_TRANS_Y_DIR =0,
  	QUAD_TRANS_Y_DIR_SIBLING=1,
 	QUAD_TRANS_Y_DIR_COUSIN=1,
 
- 	QUAD_TRANS_Z_DIR =1, 
+ 	QUAD_TRANS_Z_DIR =0, 
  	QUAD_TRANS_Z_DIR_SIBLING=1,
  	QUAD_TRANS_Z_DIR_COUSIN=1,
 
-
+	PRESWAPTRANSINTERPOLATION = 0,
 
 
 

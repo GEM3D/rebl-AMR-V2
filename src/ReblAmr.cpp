@@ -391,6 +391,16 @@ Forest.orderAnalysis(Proc,Epsilon,bc,Dirichlet,Neumann);
 
 }
 
+template <size_t N, typename Nvalue, size_t M, typename Mvalue>
+void ReblAmr<N, Nvalue, M, Mvalue>::transInterpTest()
+{
+// this is a test function to verify transverse interpolations
+	//Forest.preSwaptestTransInterpolation(Proc);
+
+	Forest.postSwaptestTransInterpolation(Proc);
+
+}
+
 
 
 
